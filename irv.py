@@ -3,17 +3,18 @@ import csv
 import numpy as np
 import pandas as pd
 
-# ballots = pd.read_csv("test.csv", header=None, index_col=False)
-# candidates = set()
-# for col in ballots:
-#     candidates.update(ballots[col].unique())
-# candidates.remove(np.nan)
+ballots = pd.read_csv("test.csv", header=None, index_col=False)
+candidates = set()
+for col in ballots:
+    candidates.update(ballots[col].unique())
+candidates.remove(np.nan)
 
 class IRVElection:
     """
     WIP IRV
     Design decisions/known limitations:
         - Only supports one election
+        - Ballot format must have the most full ballot first
         - Is somewhat conservative in ties (see run() for details)
 
     Ballot format refrence:
@@ -25,7 +26,8 @@ class IRVElection:
 
     # TODO list:
     #   - implement functions
-    #   - test test
+    #   - Support longer ballots than first
+    #   - test test test
 
     def __init__(self, file, remove_exhausted_ballots=False):
         """
@@ -41,11 +43,13 @@ class IRVElection:
         """
         self.ballots = pd.read_csv(file, header=None, index_col=False)
         self.candidates = set()
+        self.remove_exhausted_ballots = remove_exhausted_ballots
+
         for col in self.ballots:
             self.candidates.update(self.ballots[col].unique())
         self.candidates.remove(np.nan)
+
         self.ballots = self.ballots.to_numpy()
-        self.remove_exhausted_ballots = remove_exhausted_ballots
 
     def run_and_write(self, winner_file="winner.txt", steps_file="steps.txt"):
         """
@@ -97,12 +101,14 @@ class IRVElection:
         tallies = {}
         for name in self.candidates:
             tallies[name] = 0
-        steps = [tallies] # should this be empty?
+        steps = []
 
-        rund = 1
+        rund = 0
         while len(tallies) > 1:
-            tallies = self.one_round(tallies, rund)
-            steps.append(tallies)
+            tallies, removed = self.one_round(tallies, rund=rund)
+            complete_step = removed
+            complete_step.update(tallies)
+            steps.append(complete_step)
             rund += 1
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
@@ -113,7 +119,7 @@ class IRVElection:
 
         return winner, steps
 
-    def one_round(self, tallies, rund):
+    def one_round(self, tallies, rund=-1):
         """
         Helper to run one round of IRV
 
@@ -125,34 +131,41 @@ class IRVElection:
         tallies : dictornary
             - Dictornary, with candidates as keys, representing how many votes
             a candidate currently has
-        rund : int
-            - round number
+        rund : int, optional
+            - For debugging: round number, starting at zero like python arrays
 
         Returns
         -------
         new_tallies : dictornary
             - Updated tallies with new vote counts, and lowest candidate removed
+        removed : dictornary
+            - Dictornary with removed candidate and their tally count at this stage
         """
 
         active_candidates = set(tallies.keys()) # set for ``permutation independence''
-        tally_changes = {}
+        new_tallies = {}
         for name in active_candidates:
-            tally_changes[name] = 0
+            new_tallies[name] = 0
 
-        # count rund column iff candidates in all previous rows have been eliminated
-        # (and rund hasn't been either!)
+        # for each ballot, count first choice that has not been eliminated
         for i in range(self.ballots.shape[0]):
-            prev_choices = self.ballots[i,0:rund]
-            name = str(self.ballots[i,rund])
-            if name in active_candidates and (not any(x in active_candidates for x in prev_choices)):
-                tally_changes[str(self.ballots[i,rund])] += 1
+            tocount = 0
+            # is this good or bad practice?
+            try:
+                while not (self.ballots[i,tocount] in active_candidates):
+                    # check if nan if is float rather than string
+                    if type(self.ballots[i,tocount]) == float or tocount == self.ballots.shape[1]-1:
+                        raise Exception("exhausted ballot")
+                    tocount += 1
+                new_tallies[self.ballots[i,tocount]] += 1
+            except Exception as e:
+                # don't ignore real errors
+                if str(e) != "exhausted ballot":
+                    print(self.ballots[i,tocount])
+                    raise e
 
-        new_tallies = copy.deepcopy(tallies) # to avoid issues with steps?
-        for name in active_candidates:
-            new_tallies[name] = tallies[name] + tally_changes[name]
-
-        # need second for-loop due to unclear set order; this is usually helpful but not here
-        min_names = []
+        print(f"Round {rund}: New tallies are {new_tallies}")
+        min_names = [] # could have multiple last place
         for name in active_candidates:
             if len(min_names) == 0 or new_tallies[name] < new_tallies[min_names[0]]:
                 min_names = [name]
@@ -160,12 +173,12 @@ class IRVElection:
                 min_names.append(name)
 
         if len(min_names) == 1:
-            new_tallies.remove(min_names[0])
+            loser = min_names[0]
         else:
             loser = self.break_ties(min_names)
-            new_tallies.remove(loser)
+        removed = {loser : new_tallies.pop(loser)}
 
-        return new_tallies
+        return new_tallies, removed
 
     def break_ties(self, tied_candidates):
         """
@@ -183,6 +196,7 @@ class IRVElection:
         loser : string
             - The losing candidate in the tie break
         """
+        print(tied_candidates)
         raise NotImplementedError()
 
 # Ballot format refrence:
@@ -190,3 +204,13 @@ class IRVElection:
 #     -Example:
 #         A,B,C
 #         C,B
+# prev_choices = self.ballots[i,0:rund]
+# name = str(self.ballots[i,rund])
+# # print(prev_choices)
+# # print(any(x in active_candidates for x in prev_choices))
+# if name in active_candidates and (not any(x in active_candidates for x in prev_choices)):
+#     tally_changes[str(self.ballots[i,rund])] += 1
+
+# new_tallies = copy.deepcopy(tallies) # to avoid issues with steps?
+# for name in active_candidates:
+# new_tallies[name] = tallies[name] + tally_changes[name]
