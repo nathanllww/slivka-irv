@@ -3,11 +3,11 @@ import csv
 import numpy as np
 import pandas as pd
 
-ballots = pd.read_csv("test.csv", header=None, index_col=False)
-candidates = set()
-for col in ballots:
-    candidates.update(ballots[col].unique())
-candidates.remove(np.nan)
+# ballots = pd.read_csv("test.csv", header=None, index_col=False)
+# candidates = set()
+# for col in ballots:
+#     candidates.update(ballots[col].unique())
+# candidates.remove(np.nan)
 
 class IRVElection:
     """
