@@ -3,12 +3,6 @@ import csv
 import numpy as np
 import pandas as pd
 
-ballots = pd.read_csv("test.csv", header=None, index_col=False)
-candidates = set()
-for col in ballots:
-    candidates.update(ballots[col].unique())
-candidates.remove(np.nan)
-
 class IRVElection:
     """
     WIP IRV
@@ -31,7 +25,8 @@ class IRVElection:
 
     def __init__(self, file, remove_exhausted_ballots=False, verbose=False):
         """
-        Reads ballot format file into TODO
+        Initilize an election, reading ballots into numpy array, creating
+        list of candidates and setting parameters
 
         Parameters
         ----------
@@ -79,12 +74,12 @@ class IRVElection:
         ----------
         winner : string
             - Winner of the election
-        steps : TODO (see above)
-            - TODO
+        steps : list of dictornary
+            - Array of dictornaries storing candidate tallies at each stage
         winner_file : string
-            - File to write the winner to
+            - File to which to write the winner
         steps_file : string
-            - File to write the steps to
+            - File to which to write the steps
         """
 
         raise NotImplementedError()
@@ -100,9 +95,10 @@ class IRVElection:
         Returns
         -------
         winner : string
-            - Winner of the election
-        steps : np.array #TODO: figure out what data type!
-            - Array (matrix?) of election results from each step of the IRV process
+            - Winner of the election. In the event of a no confidence result, this is 
+            "No Confidence"
+        steps : list of dictornary
+            - Array of dictornaries storing candidate tallies at each stage
         """
 
         tallies = {}
@@ -121,7 +117,8 @@ class IRVElection:
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
         if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) < 0.5:
-            print(f"No confidence vote! Winner, {winner}, recieved only {tallies[winner]} votes out of {self.ballots.shape[0]} ballots")
+            if self.verbose:
+                print(f"No confidence vote! Winner, {winner}, recieved only {tallies[winner]} votes out of {self.ballots.shape[0]} ballots")
             winner = "No Confidence"
 
         return winner, steps
@@ -138,6 +135,7 @@ class IRVElection:
             a candidate currently has
         rund : int, optional
             - For debugging: round number, starting at zero like python arrays
+            Default -1
 
         Returns
         -------
