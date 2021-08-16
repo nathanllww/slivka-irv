@@ -89,8 +89,8 @@ class IRVElection:
         Runs the election
 
         Algorthmic details:
-            - If multiple candidates are tied for last, recursivly check the next
-            layer of preferences.  If complete tie, error.
+            - If multiple candidates are tied for last, tries to break ties
+            using break_ties
 
         Returns
         -------
@@ -194,7 +194,7 @@ class IRVElection:
         Parameters
         ----------
         tied_candidates : list
-            - List of the candidates tied.  Changed to reflect tie-breaking progress
+            - List of the candidates tied.  Modified to reflect tie-breaking progress
 
         Returns
         -------
@@ -221,19 +221,3 @@ class IRVElection:
                 return min_names[0]
 
         raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
-
-# Ballot format refrence:
-#     - CSV with each line a ballot, ranking candidates from left to right
-#     -Example:
-#         A,B,C
-#         C,B
-# prev_choices = self.ballots[i,0:rund]
-# name = str(self.ballots[i,rund])
-# # print(prev_choices)
-# # print(any(x in active_candidates for x in prev_choices))
-# if name in active_candidates and (not any(x in active_candidates for x in prev_choices)):
-#     tally_changes[str(self.ballots[i,rund])] += 1
-
-# new_tallies = copy.deepcopy(tallies) # to avoid issues with steps?
-# for name in active_candidates:
-# new_tallies[name] = tallies[name] + tally_changes[name]
