@@ -29,7 +29,7 @@ class IRVElection:
     #   - Support longer ballots than first
     #   - test test test
 
-    def __init__(self, file, remove_exhausted_ballots=False):
+    def __init__(self, file, remove_exhausted_ballots=False, verbose=False):
         """
         Reads ballot format file into TODO
 
@@ -40,16 +40,20 @@ class IRVElection:
         remove_exhausted_ballots : boolean, optional
             - Whether to remove exhausted ballots from the count or count them
             as ``no confidence''. Default of False does the latter
+        verbose : boolean, optional
+            - Whether to print certain progress info.  Default False
         """
+
         self.ballots = pd.read_csv(file, header=None, index_col=False)
         self.candidates = set()
-        self.remove_exhausted_ballots = remove_exhausted_ballots
 
         for col in self.ballots:
             self.candidates.update(self.ballots[col].unique())
         self.candidates.remove(np.nan)
 
         self.ballots = self.ballots.to_numpy()
+        self.remove_exhausted_ballots = remove_exhausted_ballots
+        self.verbose = verbose
 
     def run_and_write(self, winner_file="winner.txt", steps_file="steps.txt"):
         """
@@ -63,6 +67,7 @@ class IRVElection:
         steps_file : string, optional
             - File to write the steps to. Default steps.txt
         """
+
         winner_data, steps_data = self.run()
         self.write_results(winner_data, steps_data, winner_data, winner_file)
 
@@ -81,6 +86,7 @@ class IRVElection:
         steps_file : string
             - File to write the steps to
         """
+
         raise NotImplementedError()
 
     def run(self):
@@ -98,6 +104,7 @@ class IRVElection:
         steps : np.array #TODO: figure out what data type!
             - Array (matrix?) of election results from each step of the IRV process
         """
+
         tallies = {}
         for name in self.candidates:
             tallies[name] = 0
@@ -122,9 +129,7 @@ class IRVElection:
     def one_round(self, tallies, rund=-1):
         """
         Helper to run one round of IRV
-
-        This algorthim differs from the standard "remove and make 2nd place 1st place" algo, but does not have to modify ballots or shift rows.
-        It also provides an easy of seeing setps and intermediate tallies, but perhaps at the expense of being slightly more complex.
+        Algo is essentially "remove and make 2nd place 1st" but without modifying ballots
 
         Parameters
         ----------
@@ -164,7 +169,9 @@ class IRVElection:
                     print(self.ballots[i,tocount])
                     raise e
 
-        print(f"Round {rund}: New tallies are {new_tallies}")
+        if self.verbose:
+            print(f"Round {rund}: New tallies are {new_tallies}")
+
         min_names = [] # could have multiple last place
         for name in active_candidates:
             if len(min_names) == 0 or new_tallies[name] < new_tallies[min_names[0]]:
@@ -184,20 +191,38 @@ class IRVElection:
         """
         Helper to break ties between candidates, returning the loser
         Does so by comparing number of 1st choice votes, then 2nd, etc
-        If still tied (highly improbable), error
+        If still tied (hopefully unlikely), error
 
         Parameters
         ----------
         tied_candidates : list
-            - List of the candidates tied
+            - List of the candidates tied.  Changed to reflect tie-breaking progress
 
         Returns
         -------
         loser : string
             - The losing candidate in the tie break
         """
-        print(tied_candidates)
-        raise NotImplementedError()
+
+        if self.verbose:
+            print(f"Breaking ties between {tied_candidates}!")
+
+        for place in range(self.ballots.shape[1]):
+            min_names = []
+            min_val = -1
+            for name in tied_candidates:
+                place_votes = len(self.ballots[self.ballots[:,place]==name,place])
+                if min_val == -1 or place_votes < min_val:
+                    min_names = [name]
+                    min_val = place_votes
+                elif place_votes == min_val:
+                    min_names.append(name)
+
+            tied_candidates = min_names
+            if len(min_names) == 1:
+                return min_names[0]
+
+        raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
 
 # Ballot format refrence:
 #     - CSV with each line a ballot, ranking candidates from left to right
