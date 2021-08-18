@@ -16,11 +16,13 @@
 #   --remove_exhausted_ballots, --reb
 #       Do NOT require 50% of total ballots cast to win;
 #       the candidate remaining at the end of the IRV always wins.
-#       Default behavior (without this flag) is to treat exhuasted ballots as
-#       votes of no confidence.
+#       Default behavior (without this flag) is to treat exhuasted ballots as votes of no confidence.
 #
 #   --no_fail_exit, --nfe
 #       Do not exit on a failed test, and instead continue through the other tests
+#
+#   --permute
+#       Randomly permute the order of the ballots
 #
 # FILE FORMAT
 # ===========
@@ -61,8 +63,9 @@ def pgreen(skk): print("\033[92m{}\033[00m".format(skk), end="")
 
 # First, process arguments
 verbose = False
-remove_exhausted_ballots = False
+reb = False
 exit_on_fail = True
+permute = False
 
 sys.argv.pop(0) # remove the "run_irv.py" arg
 nargs = len(sys.argv)
@@ -82,7 +85,9 @@ for i in range(special_args):
     elif sys.argv[i] == '--no_fail_exit' or sys.argv[i] == '--nfe':
         exit_on_fail = False
     elif sys.argv[i] == '--remove_exhausted_ballots' or sys.argv[i] == '--reb':
-        remove_exhausted_ballots = True
+        reb = True
+    elif sys.argv[i] == '--permute':
+        permute = True
     else:
         pred("Error: ")
         print(f"Unsupport argument {sys.argv[i]}")
@@ -112,7 +117,7 @@ for f in files:
             sys.exit(1)
         real_winner = ''.join(split_line[1:])
 
-    irv_elec = irv.IRVElection(f, verbose=verbose, remove_exhausted_ballots=remove_exhausted_ballots)
+    irv_elec = irv.IRVElection(f, verbose=verbose, remove_exhausted_ballots=reb, permute=permute)
 
     try:
         if real_winner == 'tie':

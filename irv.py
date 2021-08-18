@@ -1,7 +1,8 @@
 import copy
 import csv
-import numpy as np
 import pandas as pd
+import numpy as np
+from numpy.random import default_rng
 
 class IRVElection:
     """
@@ -22,7 +23,7 @@ class IRVElection:
     #   - implement write functions
     #   - use Counter instead of dict for tallies
 
-    def __init__(self, file, remove_exhausted_ballots=False, verbose=False):
+    def __init__(self, file, remove_exhausted_ballots=False, verbose=False, permute=False):
         """
         Initilize an election, reading ballots into numpy array, creating
         list of candidates and setting parameters
@@ -36,24 +37,32 @@ class IRVElection:
             as ``no confidence''. Default of False does the latter
         verbose : boolean, optional
             - Whether to print certain progress info.  Default False
+        permute : boolean, optional
+            - Whether to randomly permute the order of ballots before processing.
+            Potentially useful in testing.  Default False
         """
 
         # first determine longest ballot (num_col), so that pandas can read properly
         # unfornuatly doesn't seem to be a way around this
         num_col = 0
-        lines = csv.reader(open(file))
-        for row in lines:
-            if num_col < len(row):
-                num_col = len(row)
+        with open(file, 'r') as csvfile:
+            lines = csv.reader(csvfile)
+            for row in lines:
+                if num_col < len(row):
+                    num_col = len(row)
 
         self.ballots = pd.read_csv(file, header=None, names=range(num_col), index_col=False, dtype='str', comment='#')
         self.candidates = set()
 
         for col in self.ballots:
             self.candidates.update(self.ballots[col].unique())
-        self.candidates.remove(np.nan)
+        if np.nan in self.candidates:
+            self.candidates.remove(np.nan)
 
         self.ballots = self.ballots.to_numpy()
+        if permute:
+            default_rng().shuffle(self.ballots)
+
         self.remove_exhausted_ballots = remove_exhausted_ballots
         self.verbose = verbose
 
@@ -206,12 +215,13 @@ class IRVElection:
     def break_ties(self, tied_candidates, tallies):
         """
         Helper to break ties between candidates, returning the loser
-        Does so by comparing number of 1st choice votes, then 2nd, etc
-        If still tied (hopefully unlikely), error
+        Compares the number of 1st choice votes, then 2nd, etc
 
         If the sum of the tallies of subset of tied_candidates is less than
         the min non-tied tally, remove all these candidates; this helps reduce
         the number of unbreakable ties
+
+        In the (hopefully unlikely) case neither of these can break the tie, error
 
         Parameters
         ----------
