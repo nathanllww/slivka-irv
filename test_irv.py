@@ -75,6 +75,7 @@ files = sys.argv[special_args:]
 if verbose:
     print(f"Starting to run elections on files {files}")
 
+failed = False
 for f in files:
     if verbose:
         print(f"\nRunning on {f}...")
@@ -105,6 +106,7 @@ for f in files:
             print(f"{f} should tie, but IRV returns {winner}")
             print("Steps:")
             print(f"{steps}")
+            failed = True
             if exit_on_fail:
                 sys.exit(2)
     else:
@@ -114,8 +116,12 @@ for f in files:
             print(f"{f} has real winner {real_winner}, but IRV returns {winner}")
             print("Steps:")
             print(f"{steps}")
+            failed = True
             if exit_on_fail:
                 sys.exit(2)
         else:
             pgreen(f"Success: ")
             print(f"{f}")
+
+if failed:
+    sys.exit(2)
