@@ -5,10 +5,10 @@ import pandas as pd
 
 class IRVElection:
     """
-    WIP IRV
+    Instant-Runoff Voting (IRV) election counter
     Design decisions/known limitations:
         - Only supports one election
-        - Is somewhat conservative in ties (see run() for details)
+        - If a candidate gets a majority, immediate win
 
     Ballot format refrence:
         - CSV with each line a ballot, ranking candidates from left to right
@@ -19,9 +19,8 @@ class IRVElection:
     """
 
     # TODO list:
-    #   - implement functions
-    #   - Support longer ballots than first
-    #   - test test test
+    #   - implement write functions
+    #   - use Counter instead of dict for tallies
 
     def __init__(self, file, remove_exhausted_ballots=False, verbose=False):
         """
@@ -117,10 +116,13 @@ class IRVElection:
         rund = 0
         while len(tallies) > 1:
             tallies, removed = self.one_round(tallies, rund=rund)
+            rem_len = len(removed)
             complete_step = removed
             complete_step.update(tallies)
             steps.append(complete_step)
             rund += 1
+            if rem_len == 0: # we only have nothing removed if majority
+                return max(tallies, key=tallies.get), steps
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
@@ -159,9 +161,12 @@ class IRVElection:
             new_tallies[name] = 0
 
         # for each ballot, count first choice that has not been eliminated
+        # this might have been more elegant by changing self.ballots so the first
+        # column is always such a choice, but I perfer not having to change ballots
+        # as this opens up to very subtle errors
         for i in range(self.ballots.shape[0]):
             tocount = 0
-            # is this good or bad practice?
+            # is this method of escaping from the loop good or bad practice?
             try:
                 while not (self.ballots[i,tocount] in active_candidates):
                     # check if nan if is float rather than string
@@ -185,33 +190,62 @@ class IRVElection:
             elif new_tallies[name] == new_tallies[min_names[0]]:
                 min_names.append(name)
 
-        if len(min_names) == 1:
-            loser = min_names[0]
-        else:
-            loser = self.break_ties(min_names)
-        removed = {loser : new_tallies.pop(loser)}
+        removed = {}
+        # don't bother removing if one candidate already has a majority
+        if max(new_tallies.values()) <= self.ballots.shape[0]/2 :
+            if len(min_names) == 1:
+                loser = min_names[0]
+                removed = {loser : new_tallies.pop(loser)}
+            else:
+                losers = self.break_ties(min_names, new_tallies)
+                for name in losers:
+                    removed[name] = new_tallies.pop(name)
 
         return new_tallies, removed
 
-    def break_ties(self, tied_candidates):
+    def break_ties(self, tied_candidates, tallies):
         """
         Helper to break ties between candidates, returning the loser
         Does so by comparing number of 1st choice votes, then 2nd, etc
         If still tied (hopefully unlikely), error
 
+        If the sum of the tallies of subset of tied_candidates is less than
+        the min non-tied tally, remove all these candidates; this helps reduce
+        the number of unbreakable ties
+
         Parameters
         ----------
         tied_candidates : list
             - List of the candidates tied.  Modified to reflect tie-breaking progress
+        tallies : dictornary
+            - The current tallies of all candidates
 
         Returns
         -------
-        loser : string
-            - The losing candidate in the tie break
+        loser : list of string
+            - The losing candidate(s) in the tie break
         """
 
         if self.verbose:
             print(f"Breaking ties between {tied_candidates}!")
+
+        # determine min non-tied tally
+        min_nt = -1
+        tied_val = tallies[tied_candidates[0]]
+        tied_sum = 0 # for debugging to double check the above line
+        for name in tallies.keys():
+            if name not in tied_candidates and (min_nt == -1 or tallies[name] < min_nt):
+                min_nt = tallies[name]
+            elif name in tied_candidates:
+                tied_sum += tallies[name]
+        if tied_sum != len(tied_candidates)*tied_val:
+            raise Exception(f"PROBLEM: tied_sum is {tied_sum} while len*tied_val is {len(tied_candidates)*tied_val}!")
+
+        # check at the beginning as well
+        if len(tied_candidates)*tied_val < min_nt:
+            if self.verbose:
+                print(f"Removed all of {tied_candidates}, since their sum tally ({len(tied_candidates)*tied_val}) was less than the min non-tied ({min_nt})")
+            return tied_candidates
 
         for place in range(self.ballots.shape[1]):
             min_names = []
@@ -227,5 +261,9 @@ class IRVElection:
             tied_candidates = min_names
             if len(min_names) == 1:
                 return min_names[0]
+            elif len(min_names)*tied_val < min_nt:
+                if self.verbose:
+                    print(f"Removed all of {min_names}, since their sum tally ({len(min_names)*tied_val}) was less than the min non-tied ({min_nt})")
+                return min_names
 
         raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
