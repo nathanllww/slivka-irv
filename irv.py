@@ -8,7 +8,6 @@ class IRVElection:
     WIP IRV
     Design decisions/known limitations:
         - Only supports one election
-        - Ballot format must have the most full ballot first
         - Is somewhat conservative in ties (see run() for details)
 
     Ballot format refrence:
@@ -16,6 +15,7 @@ class IRVElection:
         -Example:
             A,B,C
             C,B
+        - Lines starting with # are comments and thus ignored
     """
 
     # TODO list:
@@ -39,7 +39,15 @@ class IRVElection:
             - Whether to print certain progress info.  Default False
         """
 
-        self.ballots = pd.read_csv(file, header=None, index_col=False)
+        # first determine longest ballot (num_col), so that pandas can read properly
+        # unfornuatly doesn't seem to be a way around this
+        num_col = 0
+        lines = csv.reader(open(file))
+        for row in lines:
+            if num_col < len(row):
+                num_col = len(row)
+
+        self.ballots = pd.read_csv(file, header=None, names=range(num_col), index_col=False, dtype='str', comment='#')
         self.candidates = set()
 
         for col in self.ballots:
