@@ -37,8 +37,26 @@
 import sys
 import irv
 
+# FUNCTIONS
+# =========
+
+def fail(message, steps):
+    pred(f"Fail: ")
+    print(message)
+    print("Steps:")
+    print(f"{steps}")
+
+    if exit_on_fail:
+        sys.exit(2)
+    else:
+        global failed
+        failed = True
+
 def pred(skk): print("\033[91m{}\033[00m".format(skk), end="")
 def pgreen(skk): print("\033[92m{}\033[00m".format(skk), end="")
+
+# SCRIPT
+# ======
 
 # First, process arguments
 verbose = False
@@ -92,36 +110,28 @@ for f in files:
     irv_elec.candidates.remove('winner')
     if real_winner == 'tie' or real_winner == 'No Confidence':
         irv_elec.candidates.remove(real_winner)
-
-    if real_winner == 'tie':
-        erred = False
-        try:
-            winner, steps = irv_elec.run()
-        except ValueError as e:
-            pgreen("Success: ")
-            print(f"{f} (ValueError with {str(e)})")
-            erred = True
-        if not erred:
-            pred("Fail: ")
-            print(f"{f} should tie, but IRV returns {winner}")
-            print("Steps:")
-            print(f"{steps}")
-            failed = True
-            if exit_on_fail:
-                sys.exit(2)
-    else:
-        winner, steps = irv_elec.run()
-        if winner != real_winner:
-            pred(f"Fail: ")
-            print(f"{f} has real winner {real_winner}, but IRV returns {winner}")
-            print("Steps:")
-            print(f"{steps}")
-            failed = True
-            if exit_on_fail:
-                sys.exit(2)
+    try:
+        if real_winner == 'tie':
+            erred = False
+            try:
+                winner, steps = irv_elec.run()
+            except ValueError as e:
+                pgreen("Success: ")
+                print(f"{f} (ValueError with {str(e)})")
+                erred = True
+            if not erred:
+                fail(f"{f} should tie, but IRV returns {winner}", steps)
         else:
-            pgreen(f"Success: ")
-            print(f"{f}")
+            winner, steps = irv_elec.run()
+            if winner != real_winner:
+                fail(f"{f} has real winner {real_winner}, but IRV returns {winner}", steps)
+            else:
+                pgreen(f"Success: ")
+                print(f"{f}")
+    except ValueError as e: # all other errors, don't catch for stacktrace and ``unskipability''
+        fail(f"ValueError with {str(e)}", None)
 
 if failed:
     sys.exit(2)
+
+
