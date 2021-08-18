@@ -1,6 +1,6 @@
 # Script to run irv test
-# Each input file is expected to end with
-#   winner,[name of winner]
+# Each input file is expected to start with
+#   # winner:[name of winner]
 # This script will then check if results match, and print those that don't
 # If a test failes, will also print steps
 #
@@ -24,14 +24,14 @@
 #
 # FILE FORMAT
 # ===========
-#   This scripts excepts the normal ``ballot format'' (see irv.py), but also requires
-#   the last row be a "winner ballot" in order to check the IRV script.
-#   This "winner ballot" should have the  following format:
-#       winner,[name of winner]
-#   For example, if candidate A should win, then the last line of the input file should be
-#       winner,A
+#   This scripts expects the normal ``ballot format'' (see irv.py), but also requires
+#   the first row be a comment with the real winner
+#   This "winner comment" should have the following format (whitespace is stripped before the colon):
+#       #winner:[name of winner]
+#   For example, if candidate A should win, then the first line of the input file should be
+#       # winner:A
 #   To test for a tie or no confidence result, use winner name "tie" or "No Confidence"; i.e.
-#       winner,tie
+#       # winner:tie
 #
 
 import sys
@@ -55,6 +55,7 @@ def fail(message, steps):
 def pred(skk): print("\033[91m{}\033[00m".format(skk), end="")
 def pgreen(skk): print("\033[92m{}\033[00m".format(skk), end="")
 
+# ======
 # SCRIPT
 # ======
 
@@ -98,18 +99,21 @@ for f in files:
     if verbose:
         print(f"\nRunning on {f}...")
 
-    irv_elec = irv.IRVElection(f, verbose=verbose, remove_exhausted_ballots=remove_exhausted_ballots)
-    if irv_elec.ballots[-1,0] != 'winner':
-        pred("Error: ")
-        print(f"{f} lacks winner ballot, last row is {irv_elec.ballots[-1,:]}")
-        print("See test_irv.py for details of excepted format")
-        sys.exit(1)
+    real_winner = ''
+    with open(f,'r') as csvfile:
+        first_line = csvfile.readline().strip()
+        split_line = first_line.split(":")
+        start_line = ''.join(first_line[0].split())
 
-    real_winner = irv_elec.ballots[-1,1]
-    irv_elec.ballots = irv_elec.ballots[:-1,:]
-    irv_elec.candidates.remove('winner')
-    if real_winner == 'tie' or real_winner == 'No Confidence':
-        irv_elec.candidates.remove(real_winner)
+        if not start_line != "#winner" or len(split_line) < 2:
+            pred("Error: ")
+            print(f"{f} lacks winner comment, first line is {first_line}")
+            print("See test_irv for details of excepted format")
+            sys.exit(1)
+        real_winner = ''.join(split_line[1:])
+
+    irv_elec = irv.IRVElection(f, verbose=verbose, remove_exhausted_ballots=remove_exhausted_ballots)
+
     try:
         if real_winner == 'tie':
             erred = False

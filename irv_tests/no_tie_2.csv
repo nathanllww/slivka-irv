@@ -1,3 +1,4 @@
+# winner:B
 A,B,C
 A,C,B
 A,B,Q
@@ -5,4 +6,3 @@ B,C,R
 B,C,X
 C,B,Y
 C,B,Z
-winner,B

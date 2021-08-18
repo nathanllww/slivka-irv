@@ -1,3 +1,4 @@
+# winner:tie
 A,B,C
 A,C,B
 A,B
@@ -5,4 +6,3 @@ B,C
 B,C
 C,B
 C
-winner,tie
