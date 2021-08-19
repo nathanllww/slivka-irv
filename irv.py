@@ -1,6 +1,7 @@
 import copy
 import csv
 import collections
+import os
 import pandas as pd
 import numpy as np
 from numpy.random import default_rng
@@ -22,8 +23,7 @@ class IRVElection:
     """
 
     # TODO list:
-    #   - implement write functions
-    #   - use Counter instead of dict for tallies
+    #   - exception handling in write functions?
 
     def __init__(self, file, remove_exhausted_ballots=False, verbose=False, permute=False):
         """
@@ -67,24 +67,28 @@ class IRVElection:
 
         self.remove_exhausted_ballots = remove_exhausted_ballots
         self.verbose = verbose
+        self.input_file = file
 
-    def run_and_write(self, winner_file="winner.txt", steps_file="steps.txt"):
+    def run_and_write(self, output_file=None):
         """
-        Wrapper around run and write_results that runs and then writes results to
-        winner.txt and steps.txt
+        Wrapper around run and write_results that runs and then writes results
+
+        NOTE: does NOT handle exceptions from run, including unbreakable ties
 
         Parameters
         ----------
-        winner_file : string, optional
-            - File to write the winner to. Default winner.txt
-        steps_file : string, optional
-            - File to write the steps to. Default steps.txt
+        output_file : string, optional
+            - File to write the winner and steps to to.
+            If None, writes to [f]-output.txt, where f is the basename of the input
         """
 
-        winner_data, steps_data = self.run()
-        self.write_results(winner_data, steps_data, winner_data, winner_file)
+        if output_file is None:
+            output_file = os.path.basename(self.input_file).split('.')[0] + '-output.txt'
 
-    def write_results(self, winner, steps, winner_file, steps_file):
+        winner, steps = self.run()
+        self.write_results(winner, steps, output_file)
+
+    def write_results(self, winner, steps, output_file):
         """
         Writes winner and steps to winner_file and steps_file
 
@@ -94,13 +98,27 @@ class IRVElection:
             - Winner of the election
         steps : list of dictornary
             - Array of dictornaries storing candidate tallies at each stage
-        winner_file : string
-            - File to which to write the winner
-        steps_file : string
-            - File to which to write the steps
+        output_file : string
+            - File to write the details to.
         """
+        winner_line = f'= WINNER: {winner} ='
+        lines = ['='*len(winner_line) + '\n']
+        lines.append(winner_line + '\n')
+        lines.append('='*len(winner_line) + '\n')
 
-        raise NotImplementedError()
+        lines.append(f"There were {self.ballots.shape[0]} total ballots cast\n")
+        if winner != "No Confidence":
+            lines.append(f"In the final round, {winner} recieved {steps[-1][winner]} votes, or {round(100*steps[-1][winner]/self.ballots.shape[0],2)}%\n")
+        lines.append('\n\n')
+        lines.append('==========\n')
+        lines.append('= ROUNDS =\n')
+        lines.append('==========\n')
+        # TODO: sort steps, do nothing, or keep order consistent?
+        for i in range(len(steps)):
+            lines.append(f'Round {i+1}: {steps[i]}\n')
+
+        with open(output_file, 'w') as f:
+            f.writelines(lines)
 
     def run(self):
         """
