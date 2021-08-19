@@ -1,5 +1,6 @@
 import copy
 import csv
+import collections
 import pandas as pd
 import numpy as np
 from numpy.random import default_rng
@@ -13,10 +14,11 @@ class IRVElection:
 
     Ballot format refrence:
         - CSV with each line a ballot, ranking candidates from left to right
+        - Lines starting with # are comments and ignored
         -Example:
+            # this is a comment
             A,B,C
             C,B
-        - Lines starting with # are comments and thus ignored
     """
 
     # TODO list:
@@ -117,7 +119,7 @@ class IRVElection:
             - Array of dictornaries storing candidate tallies at each stage
         """
 
-        tallies = {}
+        tallies = collections.Counter()
         for name in self.candidates:
             tallies[name] = 0
         steps = []
@@ -128,10 +130,10 @@ class IRVElection:
             rem_len = len(removed)
             complete_step = removed
             complete_step.update(tallies)
-            steps.append(complete_step)
+            steps.append(dict(complete_step))
             rund += 1
             if rem_len == 0: # we only have nothing removed if majority
-                return max(tallies, key=tallies.get), steps
+                return tallies.most_common(1)[0][0], steps
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
@@ -149,8 +151,8 @@ class IRVElection:
 
         Parameters
         ----------
-        tallies : dictornary
-            - Dictornary, with candidates as keys, representing how many votes
+        tallies : Counter
+            - Counter, with candidates as keys, representing how many votes
             a candidate currently has
         rund : int, optional
             - For debugging: round number, starting at zero like python arrays
@@ -165,7 +167,7 @@ class IRVElection:
         """
 
         active_candidates = set(tallies.keys()) # set for ``permutation independence''
-        new_tallies = {}
+        new_tallies = collections.Counter()
         for name in active_candidates:
             new_tallies[name] = 0
 
@@ -186,22 +188,22 @@ class IRVElection:
             except Exception as e:
                 # don't ignore real errors
                 if str(e) != "exhausted ballot":
-                    print(self.ballots[i,tocount])
                     raise e
 
         if self.verbose:
             print(f"Round {rund}: New tallies are {new_tallies}")
 
-        min_names = [] # could have multiple last place
-        for name in active_candidates:
-            if len(min_names) == 0 or new_tallies[name] < new_tallies[min_names[0]]:
-                min_names = [name]
-            elif new_tallies[name] == new_tallies[min_names[0]]:
-                min_names.append(name)
+        # determine all min tallies, of which there could be many
+        sort_tallies = new_tallies.most_common()[::-1]
+        min_names = []
+        i = 0
+        while i < len(sort_tallies) and sort_tallies[0][1] == sort_tallies[i][1]:
+            min_names.append(sort_tallies[i][0])
+            i += 1
 
         removed = {}
         # don't bother removing if one candidate already has a majority
-        if max(new_tallies.values()) <= self.ballots.shape[0]/2 :
+        if sort_tallies[-1][1] <= self.ballots.shape[0]/2 :
             if len(min_names) == 1:
                 loser = min_names[0]
                 removed = {loser : new_tallies.pop(loser)}
@@ -227,7 +229,7 @@ class IRVElection:
         ----------
         tied_candidates : list
             - List of the candidates tied.  Modified to reflect tie-breaking progress
-        tallies : dictornary
+        tallies : Counter
             - The current tallies of all candidates
 
         Returns
@@ -240,14 +242,20 @@ class IRVElection:
             print(f"Breaking ties between {tied_candidates}!")
 
         # determine min non-tied tally
-        min_nt = -1
-        tied_val = tallies[tied_candidates[0]]
-        tied_sum = 0 # for debugging to double check the above line
-        for name in tallies.keys():
-            if name not in tied_candidates and (min_nt == -1 or tallies[name] < min_nt):
-                min_nt = tallies[name]
-            elif name in tied_candidates:
-                tied_sum += tallies[name]
+        sort_tallies = tallies.most_common()[::-1]
+        tied_val = sort_tallies[0][1]
+        tied_sum = 0 # to double check computation of tied vals (mainly for debugging)
+
+        i = 0
+        while i < len(sort_tallies) and sort_tallies[0][1] == sort_tallies[i][1]:
+            tied_sum += sort_tallies[i][1]
+            i+=1
+
+        if i == len(sort_tallies):
+            min_nt = -1
+        else:
+            min_nt = sort_tallies[i][1]
+
         if tied_sum != len(tied_candidates)*tied_val:
             raise Exception(f"PROBLEM: tied_sum is {tied_sum} while len*tied_val is {len(tied_candidates)*tied_val}!")
 
