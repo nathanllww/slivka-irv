@@ -68,8 +68,9 @@ class IRVElection:
         self.remove_exhausted_ballots = remove_exhausted_ballots
         self.verbose = verbose
         self.input_file = file
+        self.logs = []
 
-    def run_and_write(self, output_file=None):
+    def run_and_write(self, output_file=None, log_file=None):
         """
         Wrapper around run and write_results that runs and then writes results
 
@@ -80,15 +81,18 @@ class IRVElection:
         output_file : string, optional
             - File to write the winner and steps to to.
             If None, writes to [f]-output.txt, where f is the basename of the input
+        log_file : string, optional
+            - File to write the logs to, or None to not write logs.
+            Default None
         """
 
         if output_file is None:
             output_file = os.path.basename(self.input_file).split('.')[0] + '-output.txt'
 
         winner, steps = self.run()
-        self.write_results(winner, steps, output_file)
+        self.write_results(winner, steps, output_file, log_file=log_file)
 
-    def write_results(self, winner, steps, output_file):
+    def write_results(self, winner, steps, output_file, log_file=None):
         """
         Writes winner and steps to winner_file and steps_file
 
@@ -99,8 +103,12 @@ class IRVElection:
         steps : list of dictornary
             - Array of dictornaries storing candidate tallies at each stage
         output_file : string
-            - File to write the details to.
+            - File to write the details to
+        log_file : string, optional
+            - File to write the logs to, or None to not write logs
+            Default None
         """
+
         winner_line = f'= WINNER: {winner} ='
         lines = ['='*len(winner_line) + '\n']
         lines.append(winner_line + '\n')
@@ -120,18 +128,25 @@ class IRVElection:
         with open(output_file, 'w') as f:
             f.writelines(lines)
 
+        if log_file != None:
+            with open(log_file, 'w') as lf:
+                lf.writelines(self.logs)
+
     def run(self):
         """
         Runs the election
 
-        Algorthmic details:
-            - If multiple candidates are tied for last, tries to break ties
-            using break_ties
+        Algorthmic notes:
+            - See break_ties for details on how it attempts to break ties
+            - If, in any round, a candidate has a tally excedding half the total
+            ballots cast, that candidate is deemed the winner and the function returns
+            - If not remove_exhausted_ballots, exhausted ballots are treated as
+            votes of no confidence
 
         Returns
         -------
         winner : string
-            - Winner of the election. In the event of a no confidence result, this is 
+            - Winner of the election. In the event of a no confidence result, this is
             "No Confidence"
         steps : list of dictornary
             - Array of dictornaries storing candidate tallies at each stage
@@ -155,9 +170,8 @@ class IRVElection:
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
-        if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) < 0.5:
-            if self.verbose:
-                print(f"No confidence vote! Winner, {winner}, recieved only {tallies[winner]} votes out of {self.ballots.shape[0]} ballots")
+        if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) <= 0.5:
+            self.log(f"No confidence vote! Winner, {winner}, recieved only {tallies[winner]} votes out of {self.ballots.shape[0]} ballots")
             winner = "No Confidence"
 
         return winner, steps
@@ -173,7 +187,7 @@ class IRVElection:
             - Counter, with candidates as keys, representing how many votes
             a candidate currently has
         rund : int, optional
-            - For debugging: round number, starting at zero like python arrays
+            - For logging: round number, starting at zero like python arrays
             Default -1
 
         Returns
@@ -208,8 +222,7 @@ class IRVElection:
                 if str(e) != "exhausted ballot":
                     raise e
 
-        if self.verbose:
-            print(f"Round {rund}: New tallies are {new_tallies}")
+        self.log(f"Round {rund}: New tallies are {new_tallies}")
 
         # determine all min tallies, of which there could be many
         sort_tallies = new_tallies.most_common()[::-1]
@@ -256,8 +269,7 @@ class IRVElection:
             - The losing candidate(s) in the tie break
         """
 
-        if self.verbose:
-            print(f"Breaking ties between {tied_candidates}!")
+        self.log(f"Breaking ties between {tied_candidates}!")
 
         # determine min non-tied tally
         sort_tallies = tallies.most_common()[::-1]
@@ -279,8 +291,7 @@ class IRVElection:
 
         # check at the beginning as well
         if len(tied_candidates)*tied_val < min_nt:
-            if self.verbose:
-                print(f"Removed all of {tied_candidates}, since their sum tally ({len(tied_candidates)*tied_val}) was less than the min non-tied ({min_nt})")
+            self.log(f"Removed all of {tied_candidates}, since their sum tally ({len(tied_candidates)*tied_val}) was less than the min non-tied ({min_nt})")
             return tied_candidates
 
         for place in range(self.ballots.shape[1]):
@@ -298,8 +309,21 @@ class IRVElection:
             if len(min_names) == 1:
                 return min_names[0]
             elif len(min_names)*tied_val < min_nt:
-                if self.verbose:
-                    print(f"Removed all of {min_names}, since their sum tally ({len(min_names)*tied_val}) was less than the min non-tied ({min_nt})")
+                self.log(f"Removed all of {min_names}, since their sum tally ({len(min_names)*tied_val}) was less than the min non-tied ({min_nt})")
                 return min_names
 
         raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
+
+    def log(self, txt):
+        """
+        Append to txt to the logs, and if verbose == True, print txt
+
+        Parameters
+        ----------
+        txt : string
+            The string to add to the log
+        """
+
+        self.logs.append(txt + '\n')
+        if self.verbose:
+            print(txt)
