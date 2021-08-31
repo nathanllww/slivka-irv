@@ -27,7 +27,7 @@ class IRVElection:
 
     def __init__(self, file, remove_exhausted_ballots=False, verbose=False, permute=False):
         """
-        Initilize an election, reading ballots into numpy array, creating
+        Initialize an election, reading ballots into numpy array, creating
         list of candidates and setting parameters
 
         Parameters
