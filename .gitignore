@@ -1,3 +1,11 @@
+# dev
 .idea
 __pycache__
 .vscode
+
+# generated
+logs
+ballots
+
+# andreas' files
+./local/**

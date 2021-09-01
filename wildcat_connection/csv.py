@@ -1,0 +1,155 @@
+import os
+import datetime
+from numpy import nan
+import pandas as pd
+from .constants import SUBMISSION_ID_COLNAME, QUESTION_RANK_SEPARATOR, INF
+from . import BALLOT_FOLDER
+
+
+class WildcatConnectionCSV:
+    """
+    Class for converting a Wildcat Connection exported ballot CSV into
+    the ballot format for the `irv` module.
+
+    If Wildcat Connection is ever updated, this file should be changed.
+    """
+    def __init__(self, csv_filepath: str):
+        """
+        Parameters
+        ----------
+        csv_filepath : str
+            filepath to Wildcat Connection exported CSV.
+        """
+        self.csv_filepath = csv_filepath
+        self.__df: pd.DataFrame = self._get_dataframe()
+        self.question_num_candidates: dict[str, int] = self._get_question_num_candidates()
+        formatted_ballots, spoilt_ballots = self._get_ballot_formatted_strings()
+        self.question_formatted_ballots: dict[str, str] = formatted_ballots
+        self.question_spoilt_ballots: dict[str, list[str]] = spoilt_ballots
+
+    def _get_dataframe(self) -> pd.DataFrame:
+        df = pd.read_csv(self.csv_filepath, header=[1])
+        df = df.set_index(SUBMISSION_ID_COLNAME)
+        # Replacing `NaN` with inf, because checking nan equality is flaky.
+        # TODO: There has to be a better way to do this.
+        df = df.fillna(INF)
+        return df
+
+    @staticmethod
+    def _valid_rank_set(rank_set: set[int]) -> bool:
+        """
+        Checks if `rank_set` is a set of all numbers from 1 to `len(rank_set)`
+        """
+        return rank_set == set(range(1, len(rank_set) + 1))
+
+    def _get_question_num_candidates(self) -> dict[str, int]:
+        """
+        Helper function for __init__
+
+        Generates questions, and number of rankings for each question.
+        Raises ValueError if duplicate columns exist.
+
+        `self.__df` must be populated first.
+        """
+        question_ranks = [col.split(QUESTION_RANK_SEPARATOR) for col in self.__df.columns
+                          if col != SUBMISSION_ID_COLNAME]  # TODO: is this `if` statement necessary?
+        tracked = {}
+        for question, rank in question_ranks:
+            rank = int(rank)
+            tracked_ranks = tracked.setdefault(question, set())
+            if rank in tracked_ranks:
+                raise ValueError(f"Duplicate Question: {question}")
+            tracked_ranks.add(rank)
+        for question, rank_set in tracked.items():
+            if not self._valid_rank_set(rank_set):
+                raise ValueError(
+                    f"""
+                    Question {question} does not contain rank choices from 1 to {len(rank_set)}
+                    It contains: {rank_set}
+                    """
+                )
+        return {question: len(rank_set) for question, rank_set in tracked.items()}
+
+    def _get_one_ballot_format(self, question: str, num_candidates: int) -> tuple[str, list[str]]:
+        """
+        Helper function to `_get_ballot_formatted_strings`
+
+        Parameters
+        ----------
+        question : str
+            Question name
+        num_candidates : int
+            Number of candidates
+        Returns
+        -------
+        ballot_string : str
+            Formatted ballot string
+        spoiled_ballots : list[str]
+            List of Submission IDs of spoiled ballots
+        """
+        def _is_spoiled(row: list[str]) -> bool:
+            for i in range(1, len(row)):
+                if row[i-1] == INF and row[i] != INF:
+                    return True
+            return False
+
+        columns = [f"{question}{QUESTION_RANK_SEPARATOR}{rank}"
+                   for rank in range(1, num_candidates + 1)]
+        valid_rows = []
+        spoiled_ballots = []
+        for submission_id, row in self.__df[columns].iterrows():
+            row = row.tolist()
+            if _is_spoiled(row):
+                spoiled_ballots.append(submission_id)
+            else:
+                valid_rows.append(",".join([item for item in row if item != INF]))
+
+        ballot_string = "\n".join(valid_rows)
+        return ballot_string, spoiled_ballots
+
+    def _get_ballot_formatted_strings(self) -> tuple[dict[str, str], dict[str, list[str]]]:
+        """
+        For each question, get the ballot formatted string.
+
+        `self.__df` and `self.question_num_candidates` should already be populated.
+
+        Returns
+        -------
+        question_formatted_ballots : dict[str, str]
+            Contains the formatted ballot string for each question.
+        question_spoilt_ballots : dict[str, list[str]]
+            Contains the Submission IDs of the spoilt ballots for each question.
+
+        """
+        question_formatted_ballots, question_spoilt_ballots = {}, {}
+        for question, num_candidates in self.question_num_candidates.items():
+            ballot_string, spoiled_ballots = self._get_one_ballot_format(question, num_candidates)
+            question_formatted_ballots[question] = ballot_string
+            question_spoilt_ballots[question] = spoiled_ballots
+
+        return question_formatted_ballots, question_spoilt_ballots
+
+    def get_ballot_folder(self) -> str:
+        """
+        Gets folder where ballots will be saved
+
+        Returns
+        -------
+        ballot_folder : str
+        """
+        csv_basename = os.path.basename(self.csv_filepath).split('.')[0]
+        timestamp_str = str(datetime.datetime.now())
+        return os.path.join(BALLOT_FOLDER, f"{csv_basename}-{timestamp_str}")
+
+    def save_to_files(self, include_spoilt_ballots: bool = False) -> None:
+        """
+        Saves ballots to folder
+        """
+        folder = self.get_ballot_folder()
+        os.makedirs(folder)
+        for question, ballot_str in self.question_formatted_ballots:
+            with open(os.path.join(folder, f"{question}.csv")) as file:
+                file.write(ballot_str)
+            if include_spoilt_ballots:
+                with open(os.path.join(folder, f"{question}_spoilt.txt")):
+                    file.writelines(self.question_spoilt_ballots[question])

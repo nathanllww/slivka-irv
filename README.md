@@ -16,4 +16,6 @@ pip install -r requirements.txt
 
 ## Instructions
 
-TODO: fill this out
+### Create an election on wildcat connection. 
++ Each ranking should be a different question.
++ No two question should be named the same.

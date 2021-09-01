@@ -1,0 +1,13 @@
+Test Case: Single Race with many contestants
+
+SubmissionId,"Q - 3","Q - 2","Q - 1"
+"1","A","B","C"
+"2","C","B","A"
+"3","","B","A"
+"4","A","",""
+"5","","B",""
+"6","C","B",""
+"7","B","","C"
+"8","","A","C"
+"9","","","C"
+
