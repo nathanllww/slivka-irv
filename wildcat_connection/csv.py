@@ -1,9 +1,9 @@
 import os
 import datetime
-from numpy import nan
 import pandas as pd
-from .constants import SUBMISSION_ID_COLNAME, QUESTION_RANK_SEPARATOR, INF
+from .constants import SUBMISSION_ID_COLNAME, QUESTION_RANK_SEPARATOR
 from . import BALLOT_FOLDER
+from .utils import isnan
 
 
 class WildcatConnectionCSV:
@@ -30,9 +30,6 @@ class WildcatConnectionCSV:
     def _get_dataframe(self) -> pd.DataFrame:
         df = pd.read_csv(self.csv_filepath, header=[1])
         df = df.set_index(SUBMISSION_ID_COLNAME)
-        # Replacing `NaN` with inf, because checking nan equality is flaky.
-        # TODO: There has to be a better way to do this.
-        df = df.fillna(INF)
         return df
 
     @staticmethod
@@ -46,13 +43,18 @@ class WildcatConnectionCSV:
         """
         Helper function for __init__
 
-        Generates questions, and number of rankings for each question.
+        Generates questions from DataFrame, and number of rankings for each question.
         Raises ValueError if duplicate columns exist.
 
-        `self.__df` must be populated first.
+        `self.__df` should already be populated.
+
+        Returns
+        -------
+        question_num_candidates : dict[str, int]
+            Dictionary mapping question name to number of candidates.
         """
         question_ranks = [col.split(QUESTION_RANK_SEPARATOR) for col in self.__df.columns
-                          if col != SUBMISSION_ID_COLNAME]  # TODO: is this `if` statement necessary?
+                          if col != SUBMISSION_ID_COLNAME]
         tracked = {}
         for question, rank in question_ranks:
             rank = int(rank)
@@ -89,7 +91,7 @@ class WildcatConnectionCSV:
         """
         def _is_spoiled(row: list[str]) -> bool:
             for i in range(1, len(row)):
-                if row[i-1] == INF and row[i] != INF:
+                if isnan(row[i-1]) and not isnan(row[i]):
                     return True
             return False
 
@@ -102,14 +104,14 @@ class WildcatConnectionCSV:
             if _is_spoiled(row):
                 spoiled_ballots.append(submission_id)
             else:
-                valid_rows.append(",".join([item for item in row if item != INF]))
+                valid_rows.append(",".join([item for item in row if not isnan(item)]))
 
         ballot_string = "\n".join(valid_rows)
         return ballot_string, spoiled_ballots
 
     def _get_ballot_formatted_strings(self) -> tuple[dict[str, str], dict[str, list[str]]]:
         """
-        For each question, get the ballot formatted string.
+        For each question, get the ballot formatted string and the submission ids of spoilt ballots.
 
         `self.__df` and `self.question_num_candidates` should already be populated.
 

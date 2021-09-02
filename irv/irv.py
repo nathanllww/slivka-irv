@@ -2,7 +2,6 @@ import csv
 import collections
 import os
 import logging
-from typing import Union
 import pandas as pd
 import numpy as np
 from numpy.random import default_rng
@@ -102,15 +101,15 @@ class IRVElection:
         """
         Helper function for `__init__`
 
-        Initializes logger, and if `save_log` is True, then saves logs to a file in `LOGGING_FOLDER`.
+        Initializes logger, and adds handlers for logger.
 
         Parameters
         ----------
         save_log : bool
-            If True, saves logs to a file.
+            If True, saves logs to a file, by adding a FileHandler to the logger
             Default False
         log_to_stderr : bool
-            If True, prints logs to stderr
+            If True, prints logs to stderr, by adding a StreamHandler to the logger
         """
         self._logger = logging.getLogger(str(self.__class__))
         self._logger.setLevel(logging.INFO)
@@ -143,13 +142,14 @@ class IRVElection:
         """
 
         winner_line = f'= WINNER: {winner} ='
-        lines = ['='*len(winner_line) + '\n']
+        lines = ['=' * len(winner_line) + '\n']
         lines.append(winner_line + '\n')
-        lines.append('='*len(winner_line) + '\n')
+        lines.append('=' * len(winner_line) + '\n')
 
         lines.append(f"There were {self.ballots.shape[0]} total ballots cast\n")
         if winner != "No Confidence":
-            lines.append(f"In the final round, {winner} recieved {steps[-1][winner]} votes, or {round(100*steps[-1][winner]/self.ballots.shape[0],2)}%\n")
+            percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
+            lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%\n")
         lines.append('\n\n')
         lines.append('==========\n')
         lines.append('= ROUNDS =\n')
@@ -194,14 +194,17 @@ class IRVElection:
             complete_step.update(tallies)
             steps.append(dict(complete_step))
             rund += 1
-            if rem_len == 0: # we only have nothing removed if majority
+            if rem_len == 0:  # we only have nothing removed if majority
                 return tallies.most_common(1)[0][0], steps
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
         if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) <= 0.5:
             self._logger.info(
-                f"No confidence vote! Winner, {winner}, recieved only {tallies[winner]} votes out of {self.ballots.shape[0]} ballots"
+                f"""
+                No confidence vote! Winner: {winner} received {tallies[winner]} votes
+                out of {self.ballots.shape[0]} ballots
+                """
             )
             winner = "No Confidence"
 
@@ -229,7 +232,7 @@ class IRVElection:
             - Dictionary with removed candidate and their tally count at this stage
         """
 
-        active_candidates = set(tallies.keys()) # set for ``permutation independence''
+        active_candidates = set(tallies.keys())  # set for ``permutation independence''
         new_tallies = collections.Counter()
         for name in active_candidates:
             new_tallies[name] = 0
@@ -265,10 +268,10 @@ class IRVElection:
 
         removed = {}
         # don't bother removing if one candidate already has a majority
-        if sort_tallies[-1][1] <= self.ballots.shape[0]/2 :
+        if sort_tallies[-1][1] <= self.ballots.shape[0] / 2:
             if len(min_names) == 1:
                 loser = min_names[0]
-                removed = {loser : new_tallies.pop(loser)}
+                removed = {loser: new_tallies.pop(loser)}
             else:
                 losers = self.break_ties(min_names, new_tallies)
                 for name in losers:
@@ -305,7 +308,7 @@ class IRVElection:
         # determine min non-tied tally
         sort_tallies = tallies.most_common()[::-1]
         tied_val = sort_tallies[0][1]
-        tied_sum = 0 # to double check computation of tied vals (mainly for debugging)
+        tied_sum = 0  # to double check computation of tied vals (mainly for debugging)
 
         i = 0
         while i < len(sort_tallies) and sort_tallies[0][1] == sort_tallies[i][1]:
@@ -322,7 +325,10 @@ class IRVElection:
 
         # check at the beginning as well
         if len(tied_candidates) * tied_val < min_nt:
-            self._logger.info(f"Removed all of {tied_candidates}, since their sum tally ({len(tied_candidates)*tied_val}) was less than the min non-tied ({min_nt})")
+            sum_tally = len(tied_candidates) * tied_val
+            self._logger.info(
+                f"Removed all of {tied_candidates}, since their sum tally ({sum_tally}) is less than the min non-tied ({min_nt})"
+            )
             return tied_candidates
 
         for place in range(self.ballots.shape[1]):

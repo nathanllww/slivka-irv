@@ -1,7 +1,13 @@
 # dev
-.idea
-__pycache__
-.vscode
+**/.idea
+**/__pycache__
+**/.vscode
+
+# Cython
+*.pyc
+
+# PyTest
+**/.pytest_cache
 
 # generated
 logs

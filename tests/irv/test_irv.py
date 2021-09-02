@@ -1,5 +1,5 @@
 import pytest
-from irv.irv import IRVElection
+from irv import IRVElection
 from . import get_test_case_filepaths, tie_test_cases, non_tie_test_cases, real_winner
 
 

@@ -1,2 +1,2 @@
-from .env import *
+from .env import *  # noqa
 from .csv import WildcatConnectionCSV
