@@ -337,20 +337,12 @@ class IRVElection:
             tied_sum += sort_tallies[i][1]
             i += 1
 
-        if i == len(sort_tallies):
-            min_nt = -1
-        else:
+        min_nt = -1
+        if i < len(sort_tallies):
             min_nt = sort_tallies[i][1]
 
-        if tied_sum != len(tied_candidates)*tied_val:
-            raise Exception(f"PROBLEM: tied_sum is {tied_sum} while len*tied_val is {len(tied_candidates)*tied_val}!")
-
         # check at the beginning as well
-        if len(tied_candidates) * tied_val < min_nt:
-            sum_tally = len(tied_candidates) * tied_val
-            self._logger.info(
-                f"Removed all of {tied_candidates}, as their sum tally ({sum_tally}) is less than the min non-tied ({min_nt})"
-            )
+        if self.can_remove_all(tied_candidates, min_nt, tied_val):
             return tied_candidates
 
         for place in range(self.ballots.shape[1]):
@@ -365,13 +357,28 @@ class IRVElection:
                     min_names.append(name)
 
             tied_candidates = min_names
-            if len(min_names) == 1:
-                return min_names[0]
-            elif len(min_names)*tied_val < min_nt:
-                self._logger.info(
-                        f"Removed all of {min_names}, as their sum tally ({len(min_names)*tied_val})"
-                        f" was less than the min non-tied ({min_nt})"
-                        )
+            if self.can_remove_all(min_names, min_nt, tied_val):
                 return min_names
 
         raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
+
+    def can_remove_all(self, tied_candidates: list[str], min_non_tied: int, tied_val: int):
+        """
+        Determine if all of tied_candidates can be removed
+        (i.e. their sum is less than min_non_tied)
+
+        Also logs removal to reduce code duplication
+        """
+
+        if len(tied_candidates)*tied_val < min_non_tied:
+            sum_tally = len(tied_candidates)*tied_val
+            self._logger.info(
+                f"Removed all of {tied_candidates}, as their sum tally ({sum_tally}) is less than the"
+                f" min non-tied ({min_non_tied})"
+            )
+            return True
+        # can also always remove all if there's only one
+        elif len(tied_candidates) == 1:
+            return True
+        else:
+            return False
