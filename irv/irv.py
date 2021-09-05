@@ -243,18 +243,23 @@ class IRVElection:
         # as this opens up to very subtle errors
         for i in range(self.ballots.shape[0]):
             tocount = 0
-            # is this method of escaping from the loop good or bad practice?
-            try:
-                while not (self.ballots[i, tocount] in active_candidates):
-                    # check if nan if is float rather than string
-                    if type(self.ballots[i, tocount]) == float or tocount == self.ballots.shape[1]-1:
-                        raise Exception("exhausted ballot")
-                    tocount += 1
+            while not self.is_exhausted(i, tocount) and not (self.ballots[i, tocount] in active_candidates):
+                tocount += 1
+            if not self.is_exhausted(i, tocount):
                 new_tallies[self.ballots[i, tocount]] += 1
-            except Exception as e:
-                # don't ignore real errors
-                if str(e) != "exhausted ballot":
-                    raise e
+
+            # # is this method of escaping from the loop good or bad practice?
+            # try:
+            #     while not (self.ballots[i, tocount] in active_candidates):
+            #         # check if nan if is float rather than string
+            #         if type(self.ballots[i, tocount]) == float or tocount == self.ballots.shape[1]-1:
+            #             raise Exception("exhausted ballot")
+            #         tocount += 1
+            #     new_tallies[self.ballots[i, tocount]] += 1
+            # except Exception as e:
+            #     # don't ignore real errors
+            #     if str(e) != "exhausted ballot":
+            #         raise e
 
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
 
@@ -265,6 +270,23 @@ class IRVElection:
         while i < len(sort_tallies) and sort_tallies[0][1] == sort_tallies[i][1]:
             min_names.append(sort_tallies[i][0])
             i += 1
+
+        new_tallies, removed = self.remove_candidates(new_tallies, min_names, sort_tallies)
+        return new_tallies, removed
+
+    def is_exhausted(self, ballot: int, ranking: int) -> bool:
+        if ranking > self.ballots.shape[1]-1 or type(self.ballots[ballot, ranking]) == float:
+            return True
+        return False
+
+    def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
+                          list[tuple[int, str]]) -> tuple[collections.Counter, set]:
+        """
+        Remove losing candiate from new_tallies and returns set of names of removed candidate
+        (or empty set if a candiate has already won)
+
+        Modifies new_tallies, returns the name(s) of loser
+        """
 
         removed = {}
         # don't bother removing if one candidate already has a majority
@@ -327,7 +349,7 @@ class IRVElection:
         if len(tied_candidates) * tied_val < min_nt:
             sum_tally = len(tied_candidates) * tied_val
             self._logger.info(
-                f"Removed all of {tied_candidates}, since their sum tally ({sum_tally}) is less than the min non-tied ({min_nt})"
+                f"Removed all of {tied_candidates}, as their sum tally ({sum_tally}) is less than the min non-tied ({min_nt})"
             )
             return tied_candidates
 
@@ -335,7 +357,7 @@ class IRVElection:
             min_names = []
             min_val = -1
             for name in tied_candidates:
-                place_votes = len(self.ballots[self.ballots[:,place]==name,place])
+                place_votes = len(self.ballots[self.ballots[:, place] == name, place])
                 if min_val == -1 or place_votes < min_val:
                     min_names = [name]
                     min_val = place_votes
@@ -346,7 +368,10 @@ class IRVElection:
             if len(min_names) == 1:
                 return min_names[0]
             elif len(min_names)*tied_val < min_nt:
-                self._logger.info(f"Removed all of {min_names}, since their sum tally ({len(min_names)*tied_val}) was less than the min non-tied ({min_nt})")
+                self._logger.info(
+                        f"Removed all of {min_names}, as their sum tally ({len(min_names)*tied_val})"
+                        f" was less than the min non-tied ({min_nt})"
+                        )
                 return min_names
 
         raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")

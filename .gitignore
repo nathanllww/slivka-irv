@@ -15,3 +15,7 @@ ballots
 
 # andreas' files
 ./local/**
+
+# nathan's files
+Pipfile
+Pipfile.lock
