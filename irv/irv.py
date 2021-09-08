@@ -189,7 +189,7 @@ class IRVElection:
             rem_len = len(removed)
             complete_step = removed
             complete_step.update(tallies)
-            steps.append(dict(complete_step))
+            steps.append(complete_step)
             rund += 1
             if rem_len == 0:  # we only have nothing removed if majority
                 return tallies.most_common(1)[0][0], steps
@@ -207,7 +207,7 @@ class IRVElection:
 
         return winner, steps
 
-    def one_round(self, tallies: collections.Counter, rund: int = -1) -> tuple[dict, dict]:
+    def one_round(self, tallies: collections.Counter, rund: int = -1) -> tuple[collections.Counter, dict]:
         """
         Helper to run one round of IRV
         Algo is essentially "remove and make 2nd place 1st" but without modifying ballots
@@ -223,7 +223,7 @@ class IRVElection:
 
         Returns
         -------
-        new_tallies : dict
+        new_tallies : collections.Counter
             - Updated tallies with new vote counts, and lowest candidate removed
         removed : dict
             - Dictionary with removed candidate and their tally count at this stage
@@ -244,19 +244,6 @@ class IRVElection:
                 tocount += 1
             if not self.is_exhausted(i, tocount):
                 new_tallies[self.ballots[i, tocount]] += 1
-
-            # # is this method of escaping from the loop good or bad practice?
-            # try:
-            #     while not (self.ballots[i, tocount] in active_candidates):
-            #         # check if nan if is float rather than string
-            #         if type(self.ballots[i, tocount]) == float or tocount == self.ballots.shape[1]-1:
-            #             raise Exception("exhausted ballot")
-            #         tocount += 1
-            #     new_tallies[self.ballots[i, tocount]] += 1
-            # except Exception as e:
-            #     # don't ignore real errors
-            #     if str(e) != "exhausted ballot":
-            #         raise e
 
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
 
