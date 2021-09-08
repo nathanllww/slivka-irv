@@ -5,6 +5,9 @@ from . import get_test_case_filepaths, tie_test_cases, non_tie_test_cases, real_
 
 @pytest.mark.parametrize("test_file", get_test_case_filepaths())
 def test_files_format(test_file):
+    """
+    This test does not test `irv` functionality, but rather tests the validity of the tests.
+    """
     with open(test_file, 'r') as csvfile:
         first_line = csvfile.readline().strip()
         split_line = first_line.split(":")
@@ -20,7 +23,7 @@ def test_files_format(test_file):
 
 @pytest.mark.parametrize("test_file", non_tie_test_cases())
 def test_winner_keep_exhausted_ballots_no_ties(test_file):
-    irv_election = IRVElection(test_file, verbose=True, remove_exhausted_ballots=False, permute=True)
+    irv_election = IRVElection(test_file, log_to_stderr=True, remove_exhausted_ballots=False, permute=True)
     winner, _ = irv_election.run()
     assert winner == real_winner(test_file)
 
@@ -28,5 +31,5 @@ def test_winner_keep_exhausted_ballots_no_ties(test_file):
 @pytest.mark.parametrize("test_file", tie_test_cases())
 def test_winner_keep_exhausted_ballots_ties(test_file):
     with pytest.raises(ValueError):
-        irv_election = IRVElection(test_file, verbose=True, remove_exhausted_ballots=False, permute=True)
+        irv_election = IRVElection(test_file, log_to_stderr=True, remove_exhausted_ballots=False, permute=True)
         irv_election.run()

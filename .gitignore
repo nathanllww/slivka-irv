@@ -1,3 +1,21 @@
-.idea
-__pycache__
-.vscode
+# dev
+**/.idea
+**/__pycache__
+**/.vscode
+
+# Cython
+*.pyc
+
+# PyTest
+**/.pytest_cache
+
+# generated
+logs
+ballots
+
+# andreas' files
+./local/**
+
+# nathan's files
+Pipfile
+Pipfile.lock
