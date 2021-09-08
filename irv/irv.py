@@ -16,7 +16,7 @@ class IRVElection:
         - Only supports one election
         - If a candidate gets a majority, immediate win
 
-    Ballot format refrence:
+    Ballot format reference:
         - CSV with each line a ballot, ranking candidates from left to right
         - Lines starting with # are comments and ignored
         -Example:
@@ -24,9 +24,6 @@ class IRVElection:
             A,B,C
             C,B
     """
-
-    # TODO list:
-    #   - exception handling in write functions?
 
     def __init__(self, file: str,
                  remove_exhausted_ballots: bool = False,
@@ -136,7 +133,7 @@ class IRVElection:
         winner : string
             - Winner of the election
         steps : list[dict]
-            - Array of dictornaries storing candidate tallies at each stage
+            - Array of dictionaries storing candidate tallies at each stage
         output_file : string
             - File to write the details to
         """
@@ -178,7 +175,7 @@ class IRVElection:
             - Winner of the election. In the event of a no confidence result, this is
             "No Confidence"
         steps : list[dict]
-            - Array of dictornaries storing candidate tallies at each stage
+            - Array of dictionaries storing candidate tallies at each stage
         """
 
         tallies = collections.Counter()
@@ -282,8 +279,8 @@ class IRVElection:
     def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
                           list[tuple[int, str]]) -> tuple[collections.Counter, set]:
         """
-        Remove losing candiate from new_tallies and returns set of names of removed candidate
-        (or empty set if a candiate has already won)
+        Remove losing candidate from new_tallies and returns set of names of removed candidate
+        (or empty set if a candidate has already won)
 
         Modifies new_tallies, returns the name(s) of loser
         """
