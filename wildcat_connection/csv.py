@@ -12,14 +12,14 @@ class WildcatConnectionCSV:
     the ballot format for the `irv` module.
 
     If Wildcat Connection is ever updated, this file should be changed.
+
+
+    Parameters
+    ----------
+    csv_filepath : str
+        filepath to Wildcat Connection exported CSV.
     """
     def __init__(self, csv_filepath: str):
-        """
-        Parameters
-        ----------
-        csv_filepath : str
-            filepath to Wildcat Connection exported CSV.
-        """
         self.csv_filepath = csv_filepath
         self.__df: pd.DataFrame = self._get_dataframe()
         self.question_num_candidates: dict[str, int] = self._get_question_num_candidates()
@@ -145,7 +145,13 @@ class WildcatConnectionCSV:
 
     def save_to_files(self, include_spoilt_ballots: bool = False) -> None:
         """
-        Saves ballots to folder
+        Saves ballots to folder.
+
+        Parameters
+        ----------
+        include_spoilt_ballots: bool, optional
+            Whether to make another file for spoilt ballots.
+            Default: False
         """
         folder = self.get_ballot_folder()
         os.makedirs(folder)
