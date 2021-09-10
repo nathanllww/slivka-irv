@@ -32,6 +32,8 @@ class IRVElection:
         - Text stream containing ballot data.
         May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
         This class is not responsible for opening and closing this stream.
+    name : str, optional
+        - Name of election question. Used for logging.
     remove_exhausted_ballots : boolean, optional
         - Whether to remove exhausted ballots from the count or count them
         as ``no confidence''. Default of False does the latter
@@ -44,20 +46,13 @@ class IRVElection:
         - Whether to save logs to a timestamped file.
         Logs folder can be set by environment variable `LOGGING_FOLDER`.
         Default False
-    name : str, optional
-        - Name for election. Used for logs
     """
-
     def __init__(self, txt_stream: TextIOBase,
+                 name: str = '',
                  remove_exhausted_ballots: bool = False,
                  permute: bool = False,
                  log_to_stderr: bool = False,
-                 save_log: bool = False,
-                 name: str = ""):
-        """
-        Initialize an election, reading ballots into numpy array, creating
-        list of candidates and setting parameters
-        """
+                 save_log: bool = False):
         self._populate_ballots_and_candidates(txt_stream, permute=permute)
         self.remove_exhausted_ballots: bool = remove_exhausted_ballots
         self.log_to_stderr: bool = log_to_stderr
@@ -384,3 +379,52 @@ class IRVElection:
             return True
         else:
             return False
+
+    @staticmethod
+    def irv_election(txt_stream: TextIOBase,
+                     name: str,
+                     remove_exhausted_ballots: bool = False,
+                     permute: bool = False,
+                     log_to_stderr: bool = False,
+                     save_log: bool = False) -> "IRVElection":
+        """
+        Creates IRV election.
+
+        This function should be bound by argbind when using the end-to-end command line tool.
+        This is because `name` should be a kwarg when an election is initialized, but should be
+        automatically generated from a Wildcat Connection Election's question names in the command line tool.
+
+        If we decide that the only place where an IRVElection should be initialized is in `irv.__main__.run`,
+        then `__init__`'s function signature should be exactly like this function, and the class should be bound.
+
+        Parameters
+        ----------
+        txt_stream : TextIOBase
+            - Text stream containing ballot data.
+            May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
+            This class is not responsible for opening and closing this stream.
+        name : str
+            - Name of election question. Used for logging.
+        remove_exhausted_ballots : boolean, optional
+            - Whether to remove exhausted ballots from the count or count them
+            as ``no confidence''. Default of False does the latter
+        log_to_stderr : boolean, optional
+            - Whether to print certain progress info.  Default False
+        permute : boolean, optional
+            - Whether to randomly permute the order of ballots before processing.
+            Potentially useful in testing.  Default False
+        save_log : boolean, optional
+            - Whether to save logs to a timestamped file.
+            Logs folder can be set by environment variable `LOGGING_FOLDER`.
+            Default False
+        Returns
+        -------
+        election : IRVElection
+            IRVElection object from parameters.
+        """
+        return IRVElection(txt_stream,
+                           name=name,
+                           remove_exhausted_ballots=remove_exhausted_ballots,
+                           permute=permute,
+                           log_to_stderr=log_to_stderr,
+                           save_log=save_log)
