@@ -1,6 +1,7 @@
 import csv
 import collections
 import os
+from io import TextIOBase
 import logging
 import pandas as pd
 import numpy as np
@@ -23,45 +24,42 @@ class IRVElection:
             # this is a comment
             A,B,C
             C,B
-    """
 
-    def __init__(self, file: str,
+
+    Parameters
+    ----------
+    txt_stream : TextIOBase
+        - Text stream containing ballot data.
+        May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
+        This class is not responsible for opening and closing this stream.
+    name : str, optional
+        - Name of election question. Used for logging.
+    remove_exhausted_ballots : boolean, optional
+        - Whether to remove exhausted ballots from the count or count them
+        as ``no confidence''. Default of False does the latter
+    log_to_stderr : boolean, optional
+        - Whether to print certain progress info.  Default False
+    permute : boolean, optional
+        - Whether to randomly permute the order of ballots before processing.
+        Potentially useful in testing.  Default False
+    save_log : boolean, optional
+        - Whether to save logs to a timestamped file.
+        Logs folder can be set by environment variable `LOGGING_FOLDER`.
+        Default False
+    """
+    def __init__(self, txt_stream: TextIOBase,
+                 name: str = '',
                  remove_exhausted_ballots: bool = False,
                  permute: bool = False,
                  log_to_stderr: bool = False,
                  save_log: bool = False):
-        """
-        Initialize an election, reading ballots into numpy array, creating
-        list of candidates and setting parameters
-
-        Parameters
-        ----------
-        file : string
-            - Path to the file, which should be in ballot format
-        remove_exhausted_ballots : boolean, optional
-            - Whether to remove exhausted ballots from the count or count them
-            as ``no confidence''. Default of False does the latter
-        log_to_stderr : boolean, optional
-            - Whether to print certain progress info.  Default False
-        permute : boolean, optional
-            - Whether to randomly permute the order of ballots before processing.
-            Potentially useful in testing.  Default False
-        save_log : boolean, option
-            - Whether to save logs to a timestamped file.
-            Logs folder can be set by environment variable `LOGGING_FOLDER`.
-            Default False
-        """
-
-        # first determine longest ballot (num_col), so that pandas can read properly
-        # unfortunately doesn't seem to be a way around this
-
-        self._populate_ballots_and_candidates(file, permute=permute)
+        self._populate_ballots_and_candidates(txt_stream, permute=permute)
         self.remove_exhausted_ballots: bool = remove_exhausted_ballots
         self.log_to_stderr: bool = log_to_stderr
-        self.input_file: str = file
+        self.name = name
         self._setup_logger_handler(save_log, log_to_stderr)
 
-    def _populate_ballots_and_candidates(self, file: str, permute: bool = False) -> None:
+    def _populate_ballots_and_candidates(self, text_stream: TextIOBase, permute: bool = False) -> None:
         """
         Helper function for `__init__`
 
@@ -69,20 +67,18 @@ class IRVElection:
 
         Parameters
         ----------
-        file : string
-            - Path to the file, which should be in ballot format
+        text_stream : TextIOBase
+            - Text stream containing ballot data.
         permute : boolean, optional
             - Whether to randomly permute the order of ballots before processing.
             Potentially useful in testing.  Default False
         """
-        num_col = 0
-        with open(file, 'r') as csvfile:
-            lines = csv.reader(csvfile)
-            for row in lines:
-                if num_col < len(row):
-                    num_col = len(row)
+        csv_lines_lengths = [len(line) for line in csv.reader(text_stream)]
+        text_stream.seek(0)
+        max_col = max(csv_lines_lengths)
 
-        self.ballots = pd.read_csv(file, header=None, names=range(num_col), index_col=False, dtype='str', comment='#')
+        self.ballots = pd.read_csv(text_stream, header=None, names=range(max_col),
+                                   index_col=False, dtype='str', comment='#')
         self.candidates: set = set()
 
         for col in self.ballots:
@@ -114,15 +110,47 @@ class IRVElection:
             self._logger.addHandler(logging.StreamHandler())
         if save_log:
             os.makedirs(LOGGING_FOLDER, exist_ok=True)
-            input_basename = os.path.basename(self.input_file).split('.')[0]
-            timestamp_str = str(datetime.datetime.now())
+            log_name = str(datetime.datetime.now())
+            if self.name:
+                log_name = f"{self.name}-{log_name}"
             self._logger.addHandler(
                 logging.FileHandler(
                     os.path.join(
                         LOGGING_FOLDER,
-                        f"{input_basename}-{timestamp_str}-log.txt")
+                        f"{log_name}-log.txt")
                 )
             )
+
+    def results_string(self, winner, steps) -> str:
+        """
+        Generates string containing winner and steps data.
+
+        Helper function for `self.write_results
+
+        Parameters
+        ----------
+        winner : string
+            - Winner of the election
+        steps : list[dict]
+            - Array of dictionaries storing candidate tallies at each stage
+        """
+        winner_line = f'= WINNER: {winner} ='
+        lines = ['=' * len(winner_line),
+                 winner_line,
+                 '=' * len(winner_line),
+                 f"There were {self.ballots.shape[0]} total ballots cast"]
+
+        if winner != "No Confidence":
+            percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
+            lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%")
+        lines.append('\n')
+        lines.append('==========')
+        lines.append('= ROUNDS =')
+        lines.append('==========')
+        # TODO: sort steps, do nothing, or keep order consistent?
+        for i in range(len(steps)):
+            lines.append(f'Round {i+1}: {steps[i]}')
+        return "\n".join(lines)
 
     def write_results(self, winner: str, steps: list[dict], output_file: str) -> None:
         """
@@ -138,25 +166,10 @@ class IRVElection:
             - File to write the details to
         """
 
-        winner_line = f'= WINNER: {winner} ='
-        lines = ['=' * len(winner_line) + '\n']
-        lines.append(winner_line + '\n')
-        lines.append('=' * len(winner_line) + '\n')
-
-        lines.append(f"There were {self.ballots.shape[0]} total ballots cast\n")
-        if winner != "No Confidence":
-            percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
-            lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%\n")
-        lines.append('\n\n')
-        lines.append('==========\n')
-        lines.append('= ROUNDS =\n')
-        lines.append('==========\n')
-        # TODO: sort steps, do nothing, or keep order consistent?
-        for i in range(len(steps)):
-            lines.append(f'Round {i+1}: {steps[i]}\n')
+        results_string = self.results_string(winner, steps)
 
         with open(output_file, 'w') as f:
-            f.writelines(lines)
+            f.write(results_string)
 
     def run(self) -> tuple[str, list[dict]]:
         """
@@ -366,3 +379,52 @@ class IRVElection:
             return True
         else:
             return False
+
+    @staticmethod
+    def irv_election(txt_stream: TextIOBase,
+                     name: str,
+                     remove_exhausted_ballots: bool = False,
+                     permute: bool = False,
+                     log_to_stderr: bool = False,
+                     save_log: bool = False) -> "IRVElection":
+        """
+        Creates IRV election.
+
+        This function should be bound by argbind when using the end-to-end command line tool.
+        This is because `name` should be a kwarg when an election is initialized, but should be
+        automatically generated from a Wildcat Connection Election's question names in the command line tool.
+
+        If we decide that the only place where an IRVElection should be initialized is in `irv.__main__.run`,
+        then `__init__`'s function signature should be exactly like this function, and the class should be bound.
+
+        Parameters
+        ----------
+        txt_stream : TextIOBase
+            - Text stream containing ballot data.
+            May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
+            This class is not responsible for opening and closing this stream.
+        name : str
+            - Name of election question. Used for logging.
+        remove_exhausted_ballots : boolean, optional
+            - Whether to remove exhausted ballots from the count or count them
+            as ``no confidence''. Default of False does the latter
+        log_to_stderr : boolean, optional
+            - Whether to print certain progress info.  Default False
+        permute : boolean, optional
+            - Whether to randomly permute the order of ballots before processing.
+            Potentially useful in testing.  Default False
+        save_log : boolean, optional
+            - Whether to save logs to a timestamped file.
+            Logs folder can be set by environment variable `LOGGING_FOLDER`.
+            Default False
+        Returns
+        -------
+        election : IRVElection
+            IRVElection object from parameters.
+        """
+        return IRVElection(txt_stream,
+                           name=name,
+                           remove_exhausted_ballots=remove_exhausted_ballots,
+                           permute=permute,
+                           log_to_stderr=log_to_stderr,
+                           save_log=save_log)

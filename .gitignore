@@ -9,9 +9,13 @@
 # PyTest
 **/.pytest_cache
 
+# setuptools
+**/*.egg-info
+
 # generated
 logs
 ballots
+**/elections/**
 
 # andreas' files
 ./local/**
