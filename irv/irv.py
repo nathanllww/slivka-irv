@@ -78,7 +78,7 @@ class IRVElection:
         max_col = max(csv_lines_lengths)
 
         self.ballots = pd.read_csv(text_stream, header=None, names=range(max_col),
-                                   index_col=False, dtype='str', comment='#')
+                                   index_col=False, dtype='str', comment='#', skip_blank_lines=False)
         self.candidates: set = set()
 
         for col in self.ballots:
@@ -428,3 +428,20 @@ class IRVElection:
                            permute=permute,
                            log_to_stderr=log_to_stderr,
                            save_log=save_log)
+
+
+# with open('../tests/irv/test_cases/noconfidence_with_empty.csv') as text_stream:
+#     csv_lines_lengths = [len(line) for line in csv.reader(text_stream)]
+#     text_stream.seek(0)
+#     max_col = max(csv_lines_lengths)
+#     print(len(csv_lines_lengths))
+#     ballots = pd.read_csv(text_stream, header=None, names=range(max_col),
+#                                index_col=False, dtype='str', comment='#', skip_blank_lines=False)
+#     candidates: set = set()
+#     for col in ballots:
+#         candidates.update(ballots[col].unique())
+#     if np.nan in candidates:
+#         candidates.remove(np.nan)
+#     print(ballots)
+#     ballots: np.ndarray = ballots.to_numpy()
+#     print(ballots)
