@@ -78,7 +78,7 @@ class IRVElection:
         max_col = max(csv_lines_lengths)
 
         self.ballots = pd.read_csv(text_stream, header=None, names=range(max_col),
-                                   index_col=False, dtype='str', comment='#')
+                                   index_col=False, dtype='str', comment='#', skip_blank_lines=False)
         self.candidates: set = set()
 
         for col in self.ballots:
