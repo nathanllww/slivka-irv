@@ -1,6 +1,6 @@
 # Slivka Instant Runoff Voting
 
-This repo contains the logic for Instant Runoff Voting on Wildcat Connection, to be used by Slivka Executive Committee Elections. 
+This repo contains the logic for Instant Runoff Voting on Wildcat Connection, designed for Slivka Executive Committee Elections, but distributed with the MIT license so any organization may use it.
 
 [Instant Runoff Voting Wikipedia](https://en.wikipedia.org/wiki/Instant-runoff_voting)
 
