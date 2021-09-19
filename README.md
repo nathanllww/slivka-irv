@@ -18,6 +18,7 @@ Create python >=3.9 environment with the environment manager of your choice. For
 $ conda create -n slivka-irv python=3.9
 $ conda activate slivka-irv
 ```
+All the following steps, and running the program, should be done in your newly created environment.
 This package is not yet on PyPi. For now, the package should be cloned from Github, then installed.
 ```shell
 $ git clone https://github.com/nathanllww/slivka-irv.git
@@ -35,7 +36,7 @@ irv: error: the following arguments are required: wc_file
 
 ## Usage Instructions
 
-### Create an election on wildcat connection. 
+### Create an election on wildcat connection.
 + Each ranking should be a different question.
 + It does not matter if multiple questions or ballots are used.
 + No two questions should be named the same.
@@ -44,7 +45,7 @@ irv: error: the following arguments are required: wc_file
 
 ### Run on Exported CSV
 
-Let's say our exported CSV has the filepath `wc.csv`. To run IRV on `wc.csv`, enter into your terminal: 
+Let's say our exported CSV has the filepath `wc.csv`. To run IRV on `wc.csv`, enter a shell within your created environment and run:
 ```shell
 $ irv wc.csv
 ```
