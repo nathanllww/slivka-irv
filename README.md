@@ -37,12 +37,12 @@ irv: error: the following arguments are required: wc_file
 ## Usage Instructions
 
 ### Create an election on Wildcat Connection.
-<!-- See [here](docs/making_wc_election.md) for detailed instructions on making an election in Wildcat Connection.  Some brief points to rememeber are included below: -->
+See [here](docs/making_wc_election.md) for detailed instructions on making an election in Wildcat Connection.  Some brief points to rememeber are included below:
 + Each ranking should be a different question.
 + It does not matter if multiple questions or ballots are used.
 + No two questions should be named the same.
 + Export Wildcat Connection CSV.
-+ **TODO(Leo): Wildcat connection instructions**
+<!-- + **TODO(Leo): Wildcat connection instructions** -->
 
 ### Run on Exported CSV
 
