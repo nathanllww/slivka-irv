@@ -25,6 +25,14 @@ class IRVElection:
             A,B,C
             C,B
 
+    Attributes
+    ----------
+    ballots : np.ndarray[object]
+        - ndarray containing rankings of candidates, where each ranking is
+        a list of str.
+    candidates : set[str]
+        - set of candidate names
+
 
     Parameters
     ----------
@@ -56,7 +64,7 @@ class IRVElection:
         self._populate_ballots_and_candidates(txt_stream, permute=permute)
         self.remove_exhausted_ballots: bool = remove_exhausted_ballots
         self.log_to_stderr: bool = log_to_stderr
-        self.name = name
+        self.name: str = name
         self._setup_logger_handler(save_log, log_to_stderr)
 
     def _populate_ballots_and_candidates(self, text_stream: TextIOBase, permute: bool = False) -> None:

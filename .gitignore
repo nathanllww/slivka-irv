@@ -16,6 +16,7 @@
 logs
 ballots
 **/elections/**
+**/_test_cases*
 
 # andreas' files
 ./local/**

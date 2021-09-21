@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from .constants import SUBMISSION_ID_COLNAME, QUESTION_RANK_SEPARATOR
 from . import BALLOT_FOLDER
-from .utils import isnan
+from .utils import isnan, wc_update_catcher
 
 
 class WildcatConnectionCSV:
@@ -11,14 +11,24 @@ class WildcatConnectionCSV:
     Class for converting a Wildcat Connection exported ballot CSV into
     the ballot format for the `irv` module.
 
-    If Wildcat Connection is ever updated, this file should be changed.
-
+    Attributes
+    ----------
+    csv_filepath: str
+        Filepath to Wildcat Connection CSV
+    question_num_candidates: dict[str, int]
+        Maps question name to number of candidates.
+    question_formatted_ballots: dict[str, str]
+        Maps question name to formatted ballot string.
+        See `IRVElection` for information about the ballot format
+    question_spoilt_ballots: dict[str, list[str]]
+        Maps question name to list of SubmissionIDs with spoilt ballots.
 
     Parameters
     ----------
     csv_filepath : str
-        filepath to Wildcat Connection exported CSV.
+        Filepath to Wildcat Connection exported CSV.
     """
+    @wc_update_catcher
     def __init__(self, csv_filepath: str):
         self.csv_filepath = csv_filepath
         self.__df: pd.DataFrame = self._get_dataframe()
@@ -133,7 +143,7 @@ class WildcatConnectionCSV:
 
     def get_ballot_folder(self) -> str:
         """
-        Gets folder where ballots will be saved
+        Gets folder where ballots will be saved. Uses BALLOT_FOLDER constant.
 
         Returns
         -------
@@ -146,6 +156,14 @@ class WildcatConnectionCSV:
     def save_to_files(self, include_spoilt_ballots: bool = False) -> None:
         """
         Saves ballots to folder.
+
+        Each question is saved to a different file in the following format.
+
+        - ballot_folder
+            - question 1.csv
+            - question 1_spoilt.txt
+            - question 2.csv
+            - question 2_spoilt.txt
 
         Parameters
         ----------

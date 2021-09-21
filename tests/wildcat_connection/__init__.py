@@ -9,6 +9,9 @@ TEST_BALLOT_FORMAT_FOLDER = str(os.environ.get(
 TEST_SPOILT_BALLOT_FOLDER = str(os.environ.get(
     "TEST_SPOILT_BALLOT_FOLDER",
     os.path.join(os.path.dirname(__file__), "test_spoilt")))
+TEST_CASE_INVALID = str(os.environ.get(
+    "TEST_CASE_INVALID",
+    os.path.join(os.path.dirname(__file__), "test_invalid")))
 
 
 class WCTestCase:
@@ -46,4 +49,14 @@ def get_test_cases() -> list[WCTestCase]:
     return [
         WCTestCase(f) for f in
         [os.path.join(TEST_CASE_FOLDER_WC, p) for p in os.listdir(TEST_CASE_FOLDER_WC)]
+    ]
+
+
+def invalid_ranks_test_cases() -> list[WCTestCase]:
+    return [
+        WCTestCase(f) for f in
+        [
+            os.path.join(TEST_CASE_INVALID, p) for p in
+            ["invalid_ranks.csv", "invalid_ranks2.csv"]
+        ]
     ]
