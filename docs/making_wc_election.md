@@ -10,7 +10,7 @@ If you are not Assistant Chair, please contact the Assistant Chair to assign you
 ## Part 1: Creating a ballot
 This section should be completed as soon as all candidates are known.
 
-1. Navigate to the Slivka Wildcat Connection homepage and click on _Manage Organization_ near the top left corner.
+1. Navigate to the [Slivka Wildcat Connection homepage](https://northwestern.campuslabs.com/engage/organization/slivkahall) and click on _Manage Organization_ near the top left corner.
 2. Click on the menu icon next to the words _Slivka Hall_ near the top left of the page, and the within the menu click on _Elections_
 3. Click on _Create Election_ near the top right of the page.
 ![screenshot of election creation page](img1.png)
@@ -36,7 +36,7 @@ Click _Save_.
 
 ## Part 2: Holding the Election and Exporting Votes
 This section should be completed on the day of the election.
-1. Navigate to the Slivka Wildcat Connection homepage and click on _Manage Organization_ near the top right corner.
+1. Navigate to the [Slivka Wildcat Connection homepage](https://northwestern.campuslabs.com/engage/organization/slivkahall) and click on _Manage Organization_ near the top right corner.
 2. Click on the menu icon next to the words _Slivka Hall_ near the top left of the page, then within the menu click on _Elections_.
 3. Click on your election on the elections page.
 4. You should immediately be directed to the _Properties_ tab within the election menu.
