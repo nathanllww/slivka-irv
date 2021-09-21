@@ -10,6 +10,10 @@ import datetime
 from . import LOGGING_FOLDER
 
 
+class UnbreakableTieWarning(RuntimeWarning):
+    pass
+
+
 class IRVElection:
     """
     Instant-Runoff Voting (IRV) election counter
@@ -148,7 +152,7 @@ class IRVElection:
                  '=' * len(winner_line),
                  f"There were {self.ballots.shape[0]} total ballots cast"]
 
-        if winner != "No Confidence":
+        if winner != "No Confidence" and winner != "No Confidence (unbreakable tie)":
             percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
             lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%")
         lines.append('\n')
@@ -204,16 +208,19 @@ class IRVElection:
             tallies[name] = 0
         steps = []
 
-        rund = 0
-        while len(tallies) > 1:
-            tallies, removed = self.one_round(tallies, rund=rund)
-            rem_len = len(removed)
-            complete_step = removed
-            complete_step.update(tallies)
-            steps.append(complete_step)
-            rund += 1
-            if rem_len == 0:  # we only have nothing removed if majority
-                return tallies.most_common(1)[0][0], steps
+        try:
+            rund = 0
+            while len(tallies) > 1:
+                tallies, removed = self.one_round(tallies, rund=rund)
+                rem_len = len(removed)
+                complete_step = removed
+                complete_step.update(tallies)
+                steps.append(complete_step)
+                rund += 1
+                if rem_len == 0:  # we only have nothing removed if majority
+                    return tallies.most_common(1)[0][0], steps
+        except UnbreakableTieWarning:
+            return "No Confidence (unbreakable tie)", steps
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
@@ -365,7 +372,8 @@ class IRVElection:
             if self.can_remove_all(min_names, min_nt, tied_val):
                 return min_names
 
-        raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
+        self._logger.warning(f"Unbreakable tie between {tied_candidates}, new election needed")
+        raise UnbreakableTieWarning()
 
     def can_remove_all(self, tied_candidates: list[str], min_non_tied: int, tied_val: int):
         """
