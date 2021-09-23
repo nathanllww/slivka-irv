@@ -26,4 +26,4 @@ def non_tie_test_cases() -> list[str]:
 def tie_test_cases() -> list[str]:
     """Gets filepaths for test cases with ties"""
     return [test_file for test_file in get_test_case_filepaths()
-            if real_winner(test_file) == "No Confidence (unbreakable tie)"]
+            if real_winner(test_file) == UNBREAKABLE_TIE_WINNER]
