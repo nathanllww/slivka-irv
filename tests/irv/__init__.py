@@ -1,5 +1,5 @@
 import os
-
+from irv.constants import UNBREAKABLE_TIE_WINNER
 
 TEST_CASE_FOLDER_IRV = str(os.environ.get("TEST_CASE_FOLDER_IRV", "test_cases"))
 
@@ -20,10 +20,10 @@ def get_test_case_filepaths() -> list[str]:
 def non_tie_test_cases() -> list[str]:
     """Gets filepaths for non tie test cases"""
     return [test_file for test_file in get_test_case_filepaths()
-            if real_winner(test_file) != "tie"]
+            if real_winner(test_file) != UNBREAKABLE_TIE_WINNER]
 
 
 def tie_test_cases() -> list[str]:
     """Gets filepaths for test cases with ties"""
     return [test_file for test_file in get_test_case_filepaths()
-            if real_winner(test_file) == "tie"]
+            if real_winner(test_file) == "No Confidence (unbreakable tie)"]
