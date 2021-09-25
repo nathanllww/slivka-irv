@@ -8,6 +8,8 @@ import numpy as np
 from numpy.random import default_rng
 import datetime
 from . import LOGGING_FOLDER
+from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
+import warnings
 
 
 class IRVElection:
@@ -148,7 +150,7 @@ class IRVElection:
                  '=' * len(winner_line),
                  f"There were {self.ballots.shape[0]} total ballots cast"]
 
-        if winner != "No Confidence":
+        if winner not in [NO_CONFIDENCE, UNBREAKABLE_TIE_WINNER]:
             percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
             lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%")
         lines.append('\n')
@@ -207,13 +209,17 @@ class IRVElection:
         rund = 0
         while len(tallies) > 1:
             tallies, removed = self.one_round(tallies, rund=rund)
-            rem_len = len(removed)
+            if len(removed) == 0:
+                front_runner = tallies.most_common(1)[0][0]
+                percent_front_runner = tallies[front_runner] / (self.ballots.shape[0])
+                if percent_front_runner > 0.5:  # we only have nothing removed if majority
+                    return front_runner, steps
+                else:  # or if a tie cannot be broken
+                    return UNBREAKABLE_TIE_WINNER, steps
             complete_step = removed
             complete_step.update(tallies)
             steps.append(complete_step)
             rund += 1
-            if rem_len == 0:  # we only have nothing removed if majority
-                return tallies.most_common(1)[0][0], steps
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
         winner = list(tallies.keys())[0]
@@ -224,7 +230,7 @@ class IRVElection:
                 out of {self.ballots.shape[0]} ballots
                 """
             )
-            winner = "No Confidence"
+            winner = NO_CONFIDENCE
 
         return winner, steps
 
@@ -285,7 +291,7 @@ class IRVElection:
         return False
 
     def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
-                          list[tuple[int, str]]) -> tuple[collections.Counter, set]:
+                          list[tuple[int, str]]) -> tuple[collections.Counter, dict]:
         """
         Remove losing candidate from new_tallies and returns set of names of removed candidate
         (or empty set if a candidate has already won)
@@ -306,7 +312,9 @@ class IRVElection:
 
         return new_tallies, removed
 
-    def break_ties(self, tied_candidates: list[str], tallies: collections.Counter) -> list[str]:
+    def break_ties(self,
+                   tied_candidates: list[str],
+                   tallies: collections.Counter) -> list[str]:
         """
         Helper to break ties between candidates, returning the loser
         Compares the number of 1st choice votes, then 2nd, etc
@@ -315,7 +323,8 @@ class IRVElection:
         the min non-tied tally, remove all these candidates; this helps reduce
         the number of unbreakable ties
 
-        In the (hopefully unlikely) case neither of these can break the tie, error
+        In the (hopefully unlikely) case neither of these can break the tie, and empty list
+        will be returned.
 
         Parameters
         ----------
@@ -326,8 +335,8 @@ class IRVElection:
 
         Returns
         -------
-        loser : list of string
-            - The losing candidate(s) in the tie break
+        loser : list[str]
+            - The losing candidate(s) in the tie break.
         """
 
         self._logger.info(f"Breaking ties between {tied_candidates}!")
@@ -365,7 +374,8 @@ class IRVElection:
             if self.can_remove_all(min_names, min_nt, tied_val):
                 return min_names
 
-        raise ValueError(f"Unbreakable tie between {tied_candidates}, new election needed")
+        warnings.warn(f"Unbreakable tie between {tied_candidates}, new election needed")
+        return []
 
     def can_remove_all(self, tied_candidates: list[str], min_non_tied: int, tied_val: int):
         """

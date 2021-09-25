@@ -32,8 +32,9 @@ def test_winner_keep_exhausted_ballots_no_ties(test_filepath):
 
 @pytest.mark.parametrize("test_filepath", tie_test_cases())
 def test_winner_keep_exhausted_ballots_ties(test_filepath):
-    with pytest.raises(ValueError):
-        with open(test_filepath) as file:
-            irv_election = IRVElection(file, log_to_stderr=True,
-                                       remove_exhausted_ballots=False, permute=True)
-        irv_election.run()
+    with open(test_filepath) as file:
+        irv_election = IRVElection(file, log_to_stderr=True,
+                                   remove_exhausted_ballots=False, permute=True)
+    with pytest.warns(UserWarning):
+        winner, _ = irv_election.run()
+    assert winner.startswith("No Confidence")
