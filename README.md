@@ -19,10 +19,9 @@ $ conda create -n slivka-irv python=3.9
 $ conda activate slivka-irv
 ```
 All the following steps, and running the program, should be done in your newly created environment.
-This package is not yet on PyPi. For now, the package should be cloned from Github, then installed.
+Install the package from PyPI
 ```shell
-$ git clone https://github.com/nathanllww/slivka-irv.git
-$ pip install -e slivka-irv
+$ pip install slivka-irv
 ```
 Ensure the package is installed correctly.
 ```shell
