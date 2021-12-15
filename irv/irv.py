@@ -10,6 +10,7 @@ import datetime
 from . import LOGGING_FOLDER
 from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
 import warnings
+from copy import deepcopy
 
 
 class IRVElection:
@@ -209,6 +210,9 @@ class IRVElection:
         rund = 0
         while len(tallies) > 1:
             tallies, removed = self.one_round(tallies, rund=rund)
+            complete_step = deepcopy(removed)
+            complete_step.update(tallies)
+            steps.append(complete_step)
             if len(removed) == 0:
                 front_runner = tallies.most_common(1)[0][0]
                 percent_front_runner = tallies[front_runner] / (self.ballots.shape[0])
@@ -216,9 +220,6 @@ class IRVElection:
                     return front_runner, steps
                 else:  # or if a tie cannot be broken
                     return UNBREAKABLE_TIE_WINNER, steps
-            complete_step = removed
-            complete_step.update(tallies)
-            steps.append(complete_step)
             rund += 1
 
         # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
