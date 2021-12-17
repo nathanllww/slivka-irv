@@ -10,6 +10,7 @@ import datetime
 from . import LOGGING_FOLDER
 from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
 import warnings
+from copy import deepcopy
 
 
 class IRVElection:
@@ -206,9 +207,22 @@ class IRVElection:
             tallies[name] = 0
         steps = []
 
+        if len(tallies) == 0:
+            self._logger.warning(
+                """
+                Completely empty list of ballots, meaning everyone ranked no candidates.
+                Are you sure this is what happened?
+                """
+            )
+            winner = NO_CONFIDENCE
+            return winner, steps
+
         rund = 0
         while len(tallies) > 1:
             tallies, removed = self.one_round(tallies, rund=rund)
+            complete_step = deepcopy(removed)
+            complete_step.update(tallies)
+            steps.append(complete_step)
             if len(removed) == 0:
                 front_runner = tallies.most_common(1)[0][0]
                 percent_front_runner = tallies[front_runner] / (self.ballots.shape[0])
@@ -216,12 +230,10 @@ class IRVElection:
                     return front_runner, steps
                 else:  # or if a tie cannot be broken
                     return UNBREAKABLE_TIE_WINNER, steps
-            complete_step = removed
-            complete_step.update(tallies)
-            steps.append(complete_step)
             rund += 1
 
-        # if remove_exhausted_ballots, we have a winner regardless of exhausted ballots
+        tallies = self.count_vals(tallies)
+
         winner = list(tallies.keys())[0]
         if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) <= 0.5:
             self._logger.info(
@@ -256,6 +268,24 @@ class IRVElection:
             - Dictionary with removed candidate and their tally count at this stage
         """
 
+        new_tallies = self.count_vals(tallies)
+
+        # determine all min tallies, of which there could be many
+        sort_tallies = new_tallies.most_common()[::-1]
+        min_names = []
+        i = 0
+        while i < len(sort_tallies) and sort_tallies[0][1] == sort_tallies[i][1]:
+            min_names.append(sort_tallies[i][0])
+            i += 1
+
+        new_tallies, removed = self.remove_candidates(new_tallies, min_names, sort_tallies)
+        return new_tallies, removed
+
+    def count_vals(self, tallies: collections.Counter, rund: int = -1) -> collections.Counter:
+        """
+        Helper to count, but not modify, the tallies at any step
+        Used by one_count and run (for final tally count)
+        """
         active_candidates = set(tallies.keys())  # set for ``permutation independence''
         new_tallies = collections.Counter()
         for name in active_candidates:
@@ -273,17 +303,7 @@ class IRVElection:
                 new_tallies[self.ballots[i, tocount]] += 1
 
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
-
-        # determine all min tallies, of which there could be many
-        sort_tallies = new_tallies.most_common()[::-1]
-        min_names = []
-        i = 0
-        while i < len(sort_tallies) and sort_tallies[0][1] == sort_tallies[i][1]:
-            min_names.append(sort_tallies[i][0])
-            i += 1
-
-        new_tallies, removed = self.remove_candidates(new_tallies, min_names, sort_tallies)
-        return new_tallies, removed
+        return new_tallies
 
     def is_exhausted(self, ballot: int, ranking: int) -> bool:
         if ranking > self.ballots.shape[1]-1 or type(self.ballots[ballot, ranking]) == float:
