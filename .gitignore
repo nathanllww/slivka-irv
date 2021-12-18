@@ -11,6 +11,7 @@
 
 # setuptools
 **/*.egg-info
+dist
 
 # generated
 logs
