@@ -32,7 +32,7 @@ class WCTestCase:
         return ballot_formats
 
     @property
-    def spoilt_ballots(self) -> dict[str, list[int]]:
+    def spoilt_ballots(self) -> dict[str, list[str]]:
         """Gets spoilt ballot answers"""
         folder = os.path.join(TEST_SPOILT_BALLOT_FOLDER, self.__basename)
         spoilt_ballots = {}
@@ -40,8 +40,9 @@ class WCTestCase:
             question = os.path.basename(path).split('.')[0]
             with open(os.path.join(folder, path)) as file:
                 spoilt_ballots[question] = [
-                    int(submission_id) for submission_id in file.readlines()
+                    line.strip() for line in file.readlines()
                 ]
+
         return spoilt_ballots
 
 

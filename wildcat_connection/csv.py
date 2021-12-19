@@ -38,9 +38,8 @@ class WildcatConnectionCSV:
         self.question_spoilt_ballots: dict[str, list[str]] = spoilt_ballots
 
     def _get_dataframe(self) -> pd.DataFrame:
-        df = pd.read_csv(self.csv_filepath, header=[1])
+        df = pd.read_csv(self.csv_filepath, header=[1], dtype=str)
         df = df.set_index(SUBMISSION_ID_COLNAME)
-        df = df.astype(str)
         return df
 
     @staticmethod
