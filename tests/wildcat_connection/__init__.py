@@ -40,8 +40,9 @@ class WCTestCase:
             question = os.path.basename(path).split('.')[0]
             with open(os.path.join(folder, path)) as file:
                 spoilt_ballots[question] = [
-                    int(submission_id) for submission_id in file.readlines()
+                    int(line) for line in file.readlines()
                 ]
+
         return spoilt_ballots
 
 

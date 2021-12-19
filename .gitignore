@@ -21,6 +21,7 @@ ballots
 
 # andreas' files
 ./local/**
+new_election.csv
 
 # nathan's files
 Pipfile
