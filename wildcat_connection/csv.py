@@ -40,6 +40,7 @@ class WildcatConnectionCSV:
     def _get_dataframe(self) -> pd.DataFrame:
         df = pd.read_csv(self.csv_filepath, header=[1])
         df = df.set_index(SUBMISSION_ID_COLNAME)
+        df = df.astype(str)
         return df
 
     @staticmethod
