@@ -68,7 +68,10 @@ class WildcatConnectionCSV:
                           if col != SUBMISSION_ID_COLNAME]
         tracked = {}
         for question, rank in question_ranks:
-            rank = int(rank)
+            try:
+                rank = int(rank)
+            except ValueError:
+                raise ValueError(f"Duplicate Question: {question}")
             tracked_ranks = tracked.setdefault(question, set())
             if rank in tracked_ranks:
                 raise ValueError(f"Duplicate Question: {question}")
