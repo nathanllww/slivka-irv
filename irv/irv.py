@@ -233,6 +233,7 @@ class IRVElection:
             rund += 1
 
         tallies = self.count_vals(tallies)
+        steps.append(tallies)
 
         winner = list(tallies.keys())[0]
         if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) <= 0.5:
