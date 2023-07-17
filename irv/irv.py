@@ -1,3 +1,4 @@
+
 import csv
 import collections
 import os
@@ -58,19 +59,17 @@ class IRVElection:
         Logs folder can be set by environment variable `LOGGING_FOLDER`.
         Default False
     """
-    def __init__(self, txt_stream: TextIOBase,
-                 name: str = '',
+    def __init__(self, votes,
                  remove_exhausted_ballots: bool = False,
                  permute: bool = False,
                  log_to_stderr: bool = False,
                  save_log: bool = False):
-        self._populate_ballots_and_candidates(txt_stream, permute=permute)
+        self._populate_ballots_and_candidates(votes, permute=permute)
         self.remove_exhausted_ballots: bool = remove_exhausted_ballots
         self.log_to_stderr: bool = log_to_stderr
-        self.name: str = name
         self._setup_logger_handler(save_log, log_to_stderr)
 
-    def _populate_ballots_and_candidates(self, text_stream: TextIOBase, permute: bool = False) -> None:
+    def _populate_ballots_and_candidates(self, votes, permute: bool = False) -> None:
         """
         Helper function for `__init__`
 
@@ -84,22 +83,20 @@ class IRVElection:
             - Whether to randomly permute the order of ballots before processing.
             Potentially useful in testing.  Default False
         """
-        csv_lines_lengths = [len(line) for line in csv.reader(text_stream)]
-        text_stream.seek(0)
-        max_col = max(csv_lines_lengths)
+        self.votes: list[list[str]] = votes
+        for single_ballot in votes:
+            for candidate in single_ballot:
+                if single_ballot.count(candidate) > 1:
+                    raise ValueError("There are duplicate votes in a single ballot!")
 
-        self.ballots = pd.read_csv(text_stream, header=None, names=range(max_col),
-                                   index_col=False, dtype='str', comment='#', skip_blank_lines=False)
+            typecheck = all(isinstance(candidate, str) for candidate in single_ballot)
+            if not typecheck:
+                raise ValueError("Not every value is a string!")
+
         self.candidates: set = set()
 
-        for col in self.ballots:
-            self.candidates.update(self.ballots[col].unique())
-        if np.nan in self.candidates:
-            self.candidates.remove(np.nan)
-
-        self.ballots: np.ndarray = self.ballots.to_numpy()
         if permute:
-            default_rng().shuffle(self.ballots)
+            default_rng().shuffle(self.votes)
 
     def _setup_logger_handler(self, save_log: bool, log_to_stderr: bool) -> None:
         """
@@ -122,8 +119,6 @@ class IRVElection:
         if save_log:
             os.makedirs(LOGGING_FOLDER, exist_ok=True)
             log_name = str(datetime.datetime.now())
-            if self.name:
-                log_name = f"{self.name}-{log_name}"
             self._logger.addHandler(
                 logging.FileHandler(
                     os.path.join(
@@ -149,10 +144,10 @@ class IRVElection:
         lines = ['=' * len(winner_line),
                  winner_line,
                  '=' * len(winner_line),
-                 f"There were {self.ballots.shape[0]} total ballots cast"]
+                 f"There were {len(self.votes)} total ballots cast"]
 
         if winner not in [NO_CONFIDENCE, UNBREAKABLE_TIE_WINNER]:
-            percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
+            percent_votes = round(100*steps[-1][winner]/len(self.votes), 2)
             lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%")
         lines.append('\n')
         lines.append('==========')
@@ -225,7 +220,7 @@ class IRVElection:
             steps.append(complete_step)
             if len(removed) == 0:
                 front_runner = tallies.most_common(1)[0][0]
-                percent_front_runner = tallies[front_runner] / (self.ballots.shape[0])
+                percent_front_runner = tallies[front_runner] / (len(self.votes))
                 if percent_front_runner > 0.5:  # we only have nothing removed if majority
                     return front_runner, steps
                 else:  # or if a tie cannot be broken
@@ -236,11 +231,11 @@ class IRVElection:
         steps.append(tallies)
 
         winner = list(tallies.keys())[0]
-        if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) <= 0.5:
+        if not self.remove_exhausted_ballots and tallies[winner]/(len(self.votes)) <= 0.5:
             self._logger.info(
                 f"""
                 No confidence vote! Winner: {winner} received {tallies[winner]} votes
-                out of {self.ballots.shape[0]} ballots
+                out of {len(self.votes)} ballots
                 """
             )
             winner = NO_CONFIDENCE
@@ -296,7 +291,7 @@ class IRVElection:
         # this might have been more elegant by changing self.ballots so the first
         # column is always such a choice, but I prefer not having to change ballots
         # as this opens up to very subtle errors
-        for i in range(self.ballots.shape[0]):
+        for i in range(len(self.votes)):
             tocount = 0
             while not self.is_exhausted(i, tocount) and not (self.ballots[i, tocount] in active_candidates):
                 tocount += 1
@@ -420,8 +415,7 @@ class IRVElection:
             return False
 
     @staticmethod
-    def irv_election(txt_stream: TextIOBase,
-                     name: str,
+    def irv_election(votes,
                      remove_exhausted_ballots: bool = False,
                      permute: bool = False,
                      log_to_stderr: bool = False,
@@ -461,8 +455,7 @@ class IRVElection:
         election : IRVElection
             IRVElection object from parameters.
         """
-        return IRVElection(txt_stream,
-                           name=name,
+        return IRVElection(votes,
                            remove_exhausted_ballots=remove_exhausted_ballots,
                            permute=permute,
                            log_to_stderr=log_to_stderr,
