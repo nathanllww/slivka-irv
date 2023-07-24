@@ -87,10 +87,12 @@ class IRVElection:
         for single_ballot in votes:
             for candidate in single_ballot:
                 if single_ballot.count(candidate) > 1:
+                    votes.remove(single_ballot)
                     raise ValueError("There are duplicate votes in a single ballot!")
 
             typecheck = all(isinstance(candidate, str) for candidate in single_ballot)
             if not typecheck:
+                votes.remove(single_ballot)
                 raise ValueError("Not every value is a string!")
 
         self.candidates: set = set()
@@ -292,19 +294,21 @@ class IRVElection:
         # column is always such a choice, but I prefer not having to change ballots
         # as this opens up to very subtle errors
         for i in range(len(self.votes)):
-            tocount = 0
-            while not self.is_exhausted(i, tocount) and not (self.ballots[i, tocount] in active_candidates):
-                tocount += 1
-            if not self.is_exhausted(i, tocount):
-                new_tallies[self.ballots[i, tocount]] += 1
+            to_count = 0
+            while not self.is_exhausted(i,to_count) and not (self.votes[i][to_count] in active_candidates):
+                to_count += 1
+            if not self.is_exhausted(i, to_count):
+                new_tallies[self.votes[i][to_count]] += 1
 
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
         return new_tallies
 
-    def is_exhausted(self, ballot: int, ranking: int) -> bool:
-        if ranking > self.ballots.shape[1]-1 or type(self.ballots[ballot, ranking]) == float:
-            return True
-        return False
+    def is_exhausted(self):
+        for single_ballot in self.votes:
+            for candidate in single_ballot:
+                if single_ballot[1].count(candidate) > 0:
+                    return True
+                return False
 
     def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
                           list[tuple[int, str]]) -> tuple[collections.Counter, dict]:
@@ -317,14 +321,16 @@ class IRVElection:
 
         removed = {}
         # don't bother removing if one candidate already has a majority
-        if sort_tallies[-1][1] <= self.ballots.shape[0] / 2:
-            if len(min_names) == 1:
-                loser = min_names[0]
-                removed = {loser: new_tallies.pop(loser)}
-            else:
-                losers = self.break_ties(min_names, new_tallies)
-                for name in losers:
-                    removed[name] = new_tallies.pop(name)
+        for single_ballot in self.votes:
+            for candidate in single_ballot:
+                if single_ballot[0].count(candidate) <= len(self.votes)/2:
+                    if len(min_names) == 1:
+                        loser = min_names[0]
+                        removed = {loser: new_tallies.pop(loser)}
+                    else:
+                        losers = self.break_ties(min_names, new_tallies)
+                        for name in losers:
+                            removed[name] = new_tallies.pop(name)
 
         return new_tallies, removed
 
@@ -375,11 +381,11 @@ class IRVElection:
         if self.can_remove_all(tied_candidates, min_nt, tied_val):
             return tied_candidates
 
-        for place in range(self.ballots.shape[1]):
+        for i in range(self.votes[i][1]):
             min_names = []
             min_val = -1
             for name in tied_candidates:
-                place_votes = len(self.ballots[self.ballots[:, place] == name, place])
+                place_votes = len(self.votes[self.votes[:,i] == name, i])
                 if min_val == -1 or place_votes < min_val:
                     min_names = [name]
                     min_val = place_votes
