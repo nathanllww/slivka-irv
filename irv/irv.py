@@ -303,12 +303,11 @@ class IRVElection:
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
         return new_tallies
 
-    def is_exhausted(self):
+    def is_exhausted(self, ballot: int, ranking: int) -> bool:
         for single_ballot in self.votes:
-            for candidate in single_ballot:
-                if single_ballot[1].count(candidate) > 0:
-                    return True
-                return False
+            if len(single_ballot) <= 1:
+                return True
+            return False
 
     def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
                           list[tuple[int, str]]) -> tuple[collections.Counter, dict]:
@@ -321,16 +320,14 @@ class IRVElection:
 
         removed = {}
         # don't bother removing if one candidate already has a majority
-        for single_ballot in self.votes:
-            for candidate in single_ballot:
-                if single_ballot[0].count(candidate) <= len(self.votes)/2:
-                    if len(min_names) == 1:
-                        loser = min_names[0]
-                        removed = {loser: new_tallies.pop(loser)}
-                    else:
-                        losers = self.break_ties(min_names, new_tallies)
-                        for name in losers:
-                            removed[name] = new_tallies.pop(name)
+        if sort_tallies[-1][1] <= len(self.votes) / 2:
+            if len(min_names) == 1:
+                loser = min_names[0]
+                removed = {loser: new_tallies.pop(loser)}
+            else:
+                losers =     self.break_ties(min_names, new_tallies)
+                for name in losers:
+                    removed[name] = new_tallies.pop(name)
 
         return new_tallies, removed
 
