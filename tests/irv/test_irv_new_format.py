@@ -91,6 +91,7 @@ def test_empty_ballots_are_no_confidence(array_with_empty_ballots, no_confidence
     )
 ])
 
+
 def test_candidates_eliminated(test_array_elim, winner_after_elim):
     print(test_array_elim)
     print(winner_after_elim)
@@ -99,6 +100,7 @@ def test_candidates_eliminated(test_array_elim, winner_after_elim):
                                remove_exhausted_ballots=False)
     winner, _ = irv_election.run()
     assert winner == winner_after_elim
+
 
 def test_candidate_ranking():
     ballot_list = [
@@ -110,9 +112,5 @@ def test_candidate_ranking():
     assert ballot.get_appearances_in_rank("Normie", 3) == 1
     assert ballot.get_appearances_in_rank("Norm", 1) == 2
     assert ballot.get_appearances_in_rank("Norman", 2) == 0
+    assert ballot.get_appearances_in_rank("Normie", 5) == 0
 
-def test_csv_multiple_questions():
-    # from wildcat_connection import csv
-    import pandas as pd
-    multi_q_1 = pd.read_csv('multiple_questions1.csv')
-    print(multi_q_1)

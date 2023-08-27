@@ -336,11 +336,11 @@ class IRVElection:
         if self.can_remove_all(tied_candidates, min_nt, tied_val):
             return tied_candidates
 
-        for i in range(len(self.ballots.get_candidates())):
+        for rank in range(1, len(self.ballots.get_candidates()) + 1):
             min_names = []
             min_val = -1
             for name in tied_candidates:
-                place_votes = self.ballots.get_appearances_in_rank()
+                place_votes = self.ballots.get_appearances_in_rank(name, rank)
                 if min_val == -1 or place_votes < min_val:
                     min_names = [name]
                     min_val = place_votes
@@ -378,7 +378,6 @@ class IRVElection:
     @staticmethod
     def irv_election(votes,
                      remove_exhausted_ballots: bool = False,
-                     permute: bool = False,
                      log_to_stderr: bool = False,
                      save_log: bool = False) -> "IRVElection":
         """
@@ -404,9 +403,6 @@ class IRVElection:
             as ``no confidence''. Default of False does the latter
         log_to_stderr : boolean, optional
             - Whether to print certain progress info.  Default False
-        permute : boolean, optional
-            - Whether to randomly permute the order of ballots before processing.
-            Potentially useful in testing.  Default False
         save_log : boolean, optional
             - Whether to save logs to a timestamped file.
             Logs folder can be set by environment variable `LOGGING_FOLDER`.
@@ -418,6 +414,5 @@ class IRVElection:
         """
         return IRVElection(votes,
                            remove_exhausted_ballots=remove_exhausted_ballots,
-                           permute=permute,
                            log_to_stderr=log_to_stderr,
                            save_log=save_log)
