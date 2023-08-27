@@ -1,4 +1,5 @@
-
+import pytest
+from irv.ballots import RankedChoiceBallots
 import csv
 import collections
 import os
@@ -6,7 +7,6 @@ from io import TextIOBase
 import logging
 import pandas as pd
 import numpy as np
-from numpy.random import default_rng
 import datetime
 from . import LOGGING_FOLDER
 from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
@@ -51,54 +51,21 @@ class IRVElection:
         as ``no confidence''. Default of False does the latter
     log_to_stderr : boolean, optional
         - Whether to print certain progress info.  Default False
-    permute : boolean, optional
-        - Whether to randomly permute the order of ballots before processing.
-        Potentially useful in testing.  Default False
     save_log : boolean, optional
         - Whether to save logs to a timestamped file.
         Logs folder can be set by environment variable `LOGGING_FOLDER`.
         Default False
     """
-    def __init__(self, votes,
+    def __init__(self,
+                 ballots: RankedChoiceBallots,
                  remove_exhausted_ballots: bool = False,
-                 permute: bool = False,
                  log_to_stderr: bool = False,
                  save_log: bool = False):
-        self._populate_ballots_and_candidates(votes, permute=permute)
+        self.ballots: RankedChoiceBallots = ballots
+        self.candidates: set = ballots.get_candidates()
         self.remove_exhausted_ballots: bool = remove_exhausted_ballots
         self.log_to_stderr: bool = log_to_stderr
         self._setup_logger_handler(save_log, log_to_stderr)
-
-    def _populate_ballots_and_candidates(self, votes, permute: bool = False) -> None:
-        """
-        Helper function for `__init__`
-
-        Populates `self.ballots` and `self.candidates` from `file`
-
-        Parameters
-        ----------
-        text_stream : TextIOBase
-            - Text stream containing ballot data.
-        permute : boolean, optional
-            - Whether to randomly permute the order of ballots before processing.
-            Potentially useful in testing.  Default False
-        """
-        self.votes: list[list[str]] = votes
-        for single_ballot in votes:
-            for candidate in single_ballot:
-                if single_ballot.count(candidate) > 1:
-                    votes.remove(single_ballot)
-                    raise ValueError("There are duplicate votes in a single ballot!")
-
-            typecheck = all(isinstance(candidate, str) for candidate in single_ballot)
-            if not typecheck:
-                votes.remove(single_ballot)
-                raise ValueError("Not every value is a string!")
-
-        self.candidates: set = set()
-
-        if permute:
-            default_rng().shuffle(self.votes)
 
     def _setup_logger_handler(self, save_log: bool, log_to_stderr: bool) -> None:
         """
@@ -146,10 +113,10 @@ class IRVElection:
         lines = ['=' * len(winner_line),
                  winner_line,
                  '=' * len(winner_line),
-                 f"There were {len(self.votes)} total ballots cast"]
+                 f"There were {len(self.ballots.votes)} total ballots cast"]
 
         if winner not in [NO_CONFIDENCE, UNBREAKABLE_TIE_WINNER]:
-            percent_votes = round(100*steps[-1][winner]/len(self.votes), 2)
+            percent_votes = round(100*steps[-1][winner]/len(self.ballots.votes), 2)
             lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%")
         lines.append('\n')
         lines.append('==========')
@@ -222,7 +189,7 @@ class IRVElection:
             steps.append(complete_step)
             if len(removed) == 0:
                 front_runner = tallies.most_common(1)[0][0]
-                percent_front_runner = tallies[front_runner] / (len(self.votes))
+                percent_front_runner = tallies[front_runner] / (len(self.ballots.votes))
                 if percent_front_runner > 0.5:  # we only have nothing removed if majority
                     return front_runner, steps
                 else:  # or if a tie cannot be broken
@@ -233,11 +200,11 @@ class IRVElection:
         steps.append(tallies)
 
         winner = list(tallies.keys())[0]
-        if not self.remove_exhausted_ballots and tallies[winner]/(len(self.votes)) <= 0.5:
+        if not self.remove_exhausted_ballots and tallies[winner]/(len(self.ballots.votes)) <= 0.5:
             self._logger.info(
                 f"""
                 No confidence vote! Winner: {winner} received {tallies[winner]} votes
-                out of {len(self.votes)} ballots
+                out of {len(self.ballots.votes)} ballots
                 """
             )
             winner = NO_CONFIDENCE
@@ -289,25 +256,16 @@ class IRVElection:
         for name in active_candidates:
             new_tallies[name] = 0
 
-        # for each ballot, count first choice that has not been eliminated
-        # this might have been more elegant by changing self.ballots so the first
-        # column is always such a choice, but I prefer not having to change ballots
-        # as this opens up to very subtle errors
-        for i in range(len(self.votes)):
-            to_count = 0
-            while not self.is_exhausted(i,to_count) and not (self.votes[i][to_count] in active_candidates):
-                to_count += 1
-            if not self.is_exhausted(i, to_count):
-                new_tallies[self.votes[i][to_count]] += 1
+        for i, ballot in enumerate(self.ballots.votes):  # self.ballots.votes[i] == ballot
+            for candidate in ballot:
+                if candidate in active_candidates:
+                    new_tallies[candidate] += 1
+                    break
 
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
         return new_tallies
 
-    def is_exhausted(self, ballot: int, ranking: int) -> bool:
-        for single_ballot in self.votes:
-            if len(single_ballot) <= 1:
-                return True
-            return False
+
 
     def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
                           list[tuple[int, str]]) -> tuple[collections.Counter, dict]:
@@ -320,12 +278,12 @@ class IRVElection:
 
         removed = {}
         # don't bother removing if one candidate already has a majority
-        if sort_tallies[-1][1] <= len(self.votes) / 2:
+        if sort_tallies[-1][1] <= len(self.ballots.votes) / 2:
             if len(min_names) == 1:
                 loser = min_names[0]
                 removed = {loser: new_tallies.pop(loser)}
             else:
-                losers =     self.break_ties(min_names, new_tallies)
+                losers = self.break_ties(min_names, new_tallies)
                 for name in losers:
                     removed[name] = new_tallies.pop(name)
 
@@ -378,11 +336,11 @@ class IRVElection:
         if self.can_remove_all(tied_candidates, min_nt, tied_val):
             return tied_candidates
 
-        for i in range(self.votes[i][1]):
+        for i in range(len(self.ballots.get_candidates())):
             min_names = []
             min_val = -1
             for name in tied_candidates:
-                place_votes = len(self.votes[self.votes[:,i] == name, i])
+                place_votes = self.ballots.get_appearances_in_rank()
                 if min_val == -1 or place_votes < min_val:
                     min_names = [name]
                     min_val = place_votes

@@ -1,4 +1,5 @@
 import os
+from irv.ballots import RankedChoiceBallots
 
 TEST_CASE_FOLDER_WC = str(os.environ.get(
     "TEST_CASE_FOLDER_WC",
@@ -21,14 +22,20 @@ class WCTestCase:
         self.__basename = os.path.basename(filepath).split('.')[0]
 
     @property
-    def ballot_format(self) -> dict[str, str]:
+    def ballot_format(self) -> dict[str, RankedChoiceBallots]:
         """Gets formatted ballot answers"""
         folder = os.path.join(TEST_BALLOT_FORMAT_FOLDER, self.__basename)
         ballot_formats = {}
         for path in os.listdir(folder):
             question = os.path.basename(path).split('.')[0]
             with open(os.path.join(folder, path)) as file:
-                ballot_formats[question] = file.read()
+                string_ballot_format = file.read()
+                # ANDREAS (8/13/2023)
+                # This converts the old string format into the new RankedChoiceBallots format
+                ballot_formats[question] = RankedChoiceBallots([
+                    row.split(",") for row in string_ballot_format.split("\n")
+                    if not row.strip().startswith("#") and len(row) > 0
+                ])
         return ballot_formats
 
     @property
