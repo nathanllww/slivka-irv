@@ -4,6 +4,7 @@ import pandas as pd
 from .constants import SUBMISSION_ID_COLNAME, QUESTION_RANK_SEPARATOR
 from . import BALLOT_FOLDER
 from .utils import isnan, wc_update_catcher
+from irv.ballots import RankedChoiceBallots
 
 
 class WildcatConnectionCSV:
@@ -34,7 +35,7 @@ class WildcatConnectionCSV:
         self.__df: pd.DataFrame = self._get_dataframe()
         self.question_num_candidates: dict[str, int] = self._get_question_num_candidates()
         formatted_ballots, spoilt_ballots = self._get_ballot_formatted_strings()
-        self.question_formatted_ballots: dict[str, str] = formatted_ballots
+        self.question_formatted_ballots: dict[str, RankedChoiceBallots] = formatted_ballots
         self.question_spoilt_ballots: dict[str, list[str]] = spoilt_ballots
 
     def _get_dataframe(self) -> pd.DataFrame:
@@ -86,7 +87,7 @@ class WildcatConnectionCSV:
                 )
         return {question: len(rank_set) for question, rank_set in tracked.items()}
 
-    def _get_one_ballot_format(self, question: str, num_candidates: int) -> tuple[str, list[str]]:
+    def _get_one_ballot_format(self, question: str, num_candidates: int) -> tuple[RankedChoiceBallots, list[str]]:
         """
         Helper function to `_get_ballot_formatted_strings`
 
@@ -98,8 +99,8 @@ class WildcatConnectionCSV:
             Number of candidates
         Returns
         -------
-        ballot_string : str
-            Formatted ballot string
+        ballot_list : RankedChoiceBallots
+            Ballot object
         spoiled_ballots : list[str]
             List of Submission IDs of spoiled ballots
         """
@@ -118,12 +119,12 @@ class WildcatConnectionCSV:
             if _is_spoiled(row):
                 spoiled_ballots.append(submission_id)
             else:
-                valid_rows.append(",".join([item for item in row if not isnan(item)]))
+                valid_rows.append([item for item in row if not isnan(item)])
+        # RankedChoiceBallots
+        ballots = RankedChoiceBallots(valid_rows)
+        return ballots, spoiled_ballots
 
-        ballot_string = "\n".join(valid_rows)
-        return ballot_string, spoiled_ballots
-
-    def _get_ballot_formatted_strings(self) -> tuple[dict[str, str], dict[str, list[str]]]:
+    def _get_ballot_formatted_strings(self) -> tuple[dict[str, RankedChoiceBallots], dict[str, list[str]]]:
         """
         For each question, get the ballot formatted string and the submission ids of spoilt ballots.
 

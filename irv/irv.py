@@ -1,16 +1,14 @@
-import csv
 import collections
 import os
 from io import TextIOBase
 import logging
-import pandas as pd
-import numpy as np
-from numpy.random import default_rng
 import datetime
-from . import LOGGING_FOLDER
-from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
 import warnings
 from copy import deepcopy
+
+from irv.ballots import RankedChoiceBallots
+from . import LOGGING_FOLDER
+from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
 
 
 class IRVElection:
@@ -18,7 +16,6 @@ class IRVElection:
     Instant-Runoff Voting (IRV) election counter
     Design decisions/known limitations:
         - Only supports one election
-        - If a candidate gets a majority, immediate win
 
     Ballot format reference:
         - CSV with each line a ballot, ranking candidates from left to right
@@ -28,6 +25,20 @@ class IRVElection:
             A,B,C
             C,B
 
+    Parameters
+    ----------
+    ballots : RankedChoiceBallots
+        - Ballots object containing votes cast.
+    remove_exhausted_ballots : boolean, optional
+        - Whether to remove exhausted ballots from the count or count them
+        as ``no confidence''. Default of False does the latter
+    log_to_stderr : boolean, optional
+        - Whether to print certain progress info.  Default False
+    save_log : boolean, optional
+        - Whether to save logs to a timestamped file.
+        Logs folder can be set by environment variable `LOGGING_FOLDER`.
+        Default False
+
     Attributes
     ----------
     ballots : np.ndarray[object]
@@ -36,70 +47,17 @@ class IRVElection:
     candidates : set[str]
         - set of candidate names
 
-
-    Parameters
-    ----------
-    txt_stream : TextIOBase
-        - Text stream containing ballot data.
-        May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
-        This class is not responsible for opening and closing this stream.
-    name : str, optional
-        - Name of election question. Used for logging.
-    remove_exhausted_ballots : boolean, optional
-        - Whether to remove exhausted ballots from the count or count them
-        as ``no confidence''. Default of False does the latter
-    log_to_stderr : boolean, optional
-        - Whether to print certain progress info.  Default False
-    permute : boolean, optional
-        - Whether to randomly permute the order of ballots before processing.
-        Potentially useful in testing.  Default False
-    save_log : boolean, optional
-        - Whether to save logs to a timestamped file.
-        Logs folder can be set by environment variable `LOGGING_FOLDER`.
-        Default False
     """
-    def __init__(self, txt_stream: TextIOBase,
-                 name: str = '',
+    def __init__(self,
+                 ballots: RankedChoiceBallots,
                  remove_exhausted_ballots: bool = False,
-                 permute: bool = False,
                  log_to_stderr: bool = False,
                  save_log: bool = False):
-        self._populate_ballots_and_candidates(txt_stream, permute=permute)
+        self.ballots: RankedChoiceBallots = ballots
+        self.candidates: set = ballots.get_candidates()
         self.remove_exhausted_ballots: bool = remove_exhausted_ballots
         self.log_to_stderr: bool = log_to_stderr
-        self.name: str = name
         self._setup_logger_handler(save_log, log_to_stderr)
-
-    def _populate_ballots_and_candidates(self, text_stream: TextIOBase, permute: bool = False) -> None:
-        """
-        Helper function for `__init__`
-
-        Populates `self.ballots` and `self.candidates` from `file`
-
-        Parameters
-        ----------
-        text_stream : TextIOBase
-            - Text stream containing ballot data.
-        permute : boolean, optional
-            - Whether to randomly permute the order of ballots before processing.
-            Potentially useful in testing.  Default False
-        """
-        csv_lines_lengths = [len(line) for line in csv.reader(text_stream)]
-        text_stream.seek(0)
-        max_col = max(csv_lines_lengths)
-
-        self.ballots = pd.read_csv(text_stream, header=None, names=range(max_col),
-                                   index_col=False, dtype='str', comment='#', skip_blank_lines=False)
-        self.candidates: set = set()
-
-        for col in self.ballots:
-            self.candidates.update(self.ballots[col].unique())
-        if np.nan in self.candidates:
-            self.candidates.remove(np.nan)
-
-        self.ballots: np.ndarray = self.ballots.to_numpy()
-        if permute:
-            default_rng().shuffle(self.ballots)
 
     def _setup_logger_handler(self, save_log: bool, log_to_stderr: bool) -> None:
         """
@@ -122,8 +80,6 @@ class IRVElection:
         if save_log:
             os.makedirs(LOGGING_FOLDER, exist_ok=True)
             log_name = str(datetime.datetime.now())
-            if self.name:
-                log_name = f"{self.name}-{log_name}"
             self._logger.addHandler(
                 logging.FileHandler(
                     os.path.join(
@@ -149,10 +105,10 @@ class IRVElection:
         lines = ['=' * len(winner_line),
                  winner_line,
                  '=' * len(winner_line),
-                 f"There were {self.ballots.shape[0]} total ballots cast"]
+                 f"There were {len(self.ballots.votes)} total ballots cast"]
 
         if winner not in [NO_CONFIDENCE, UNBREAKABLE_TIE_WINNER]:
-            percent_votes = round(100*steps[-1][winner]/self.ballots.shape[0], 2)
+            percent_votes = round(100*steps[-1][winner]/len(self.ballots.votes), 2)
             lines.append(f"In the final round, {winner} received {steps[-1][winner]} votes, or {percent_votes}%")
         lines.append('\n')
         lines.append('==========')
@@ -225,7 +181,7 @@ class IRVElection:
             steps.append(complete_step)
             if len(removed) == 0:
                 front_runner = tallies.most_common(1)[0][0]
-                percent_front_runner = tallies[front_runner] / (self.ballots.shape[0])
+                percent_front_runner = tallies[front_runner] / (len(self.ballots.votes))
                 if percent_front_runner > 0.5:  # we only have nothing removed if majority
                     return front_runner, steps
                 else:  # or if a tie cannot be broken
@@ -236,11 +192,11 @@ class IRVElection:
         steps.append(tallies)
 
         winner = list(tallies.keys())[0]
-        if not self.remove_exhausted_ballots and tallies[winner]/(self.ballots.shape[0]) <= 0.5:
+        if not self.remove_exhausted_ballots and tallies[winner]/(len(self.ballots.votes)) <= 0.5:
             self._logger.info(
                 f"""
                 No confidence vote! Winner: {winner} received {tallies[winner]} votes
-                out of {self.ballots.shape[0]} ballots
+                out of {len(self.ballots.votes)} ballots
                 """
             )
             winner = NO_CONFIDENCE
@@ -292,24 +248,16 @@ class IRVElection:
         for name in active_candidates:
             new_tallies[name] = 0
 
-        # for each ballot, count first choice that has not been eliminated
-        # this might have been more elegant by changing self.ballots so the first
-        # column is always such a choice, but I prefer not having to change ballots
-        # as this opens up to very subtle errors
-        for i in range(self.ballots.shape[0]):
-            tocount = 0
-            while not self.is_exhausted(i, tocount) and not (self.ballots[i, tocount] in active_candidates):
-                tocount += 1
-            if not self.is_exhausted(i, tocount):
-                new_tallies[self.ballots[i, tocount]] += 1
+        for i, ballot in enumerate(self.ballots.votes):  # self.ballots.votes[i] == ballot
+            for candidate in ballot:
+                if candidate in active_candidates:
+                    new_tallies[candidate] += 1
+                    break
 
         self._logger.info(f"Round {rund}: New tallies are {new_tallies}")
         return new_tallies
 
-    def is_exhausted(self, ballot: int, ranking: int) -> bool:
-        if ranking > self.ballots.shape[1]-1 or type(self.ballots[ballot, ranking]) == float:
-            return True
-        return False
+
 
     def remove_candidates(self, new_tallies: collections.Counter, min_names: list[str], sort_tallies:
                           list[tuple[int, str]]) -> tuple[collections.Counter, dict]:
@@ -322,7 +270,7 @@ class IRVElection:
 
         removed = {}
         # don't bother removing if one candidate already has a majority
-        if sort_tallies[-1][1] <= self.ballots.shape[0] / 2:
+        if sort_tallies[-1][1] <= len(self.ballots.votes) / 2:
             if len(min_names) == 1:
                 loser = min_names[0]
                 removed = {loser: new_tallies.pop(loser)}
@@ -380,11 +328,11 @@ class IRVElection:
         if self.can_remove_all(tied_candidates, min_nt, tied_val):
             return tied_candidates
 
-        for place in range(self.ballots.shape[1]):
+        for rank in range(1, len(self.ballots.get_candidates()) + 1):
             min_names = []
             min_val = -1
             for name in tied_candidates:
-                place_votes = len(self.ballots[self.ballots[:, place] == name, place])
+                place_votes = self.ballots.get_appearances_in_rank(name, rank)
                 if min_val == -1 or place_votes < min_val:
                     min_names = [name]
                     min_val = place_votes
@@ -418,52 +366,3 @@ class IRVElection:
             return True
         else:
             return False
-
-    @staticmethod
-    def irv_election(txt_stream: TextIOBase,
-                     name: str,
-                     remove_exhausted_ballots: bool = False,
-                     permute: bool = False,
-                     log_to_stderr: bool = False,
-                     save_log: bool = False) -> "IRVElection":
-        """
-        Creates IRV election.
-
-        This function should be bound by argbind when using the end-to-end command line tool.
-        This is because `name` should be a kwarg when an election is initialized, but should be
-        automatically generated from a Wildcat Connection Election's question names in the command line tool.
-
-        If we decide that the only place where an IRVElection should be initialized is in `irv.__main__.run`,
-        then `__init__`'s function signature should be exactly like this function, and the class should be bound.
-
-        Parameters
-        ----------
-        txt_stream : TextIOBase
-            - Text stream containing ballot data.
-            May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
-            This class is not responsible for opening and closing this stream.
-        name : str
-            - Name of election question. Used for logging.
-        remove_exhausted_ballots : boolean, optional
-            - Whether to remove exhausted ballots from the count or count them
-            as ``no confidence''. Default of False does the latter
-        log_to_stderr : boolean, optional
-            - Whether to print certain progress info.  Default False
-        permute : boolean, optional
-            - Whether to randomly permute the order of ballots before processing.
-            Potentially useful in testing.  Default False
-        save_log : boolean, optional
-            - Whether to save logs to a timestamped file.
-            Logs folder can be set by environment variable `LOGGING_FOLDER`.
-            Default False
-        Returns
-        -------
-        election : IRVElection
-            IRVElection object from parameters.
-        """
-        return IRVElection(txt_stream,
-                           name=name,
-                           remove_exhausted_ballots=remove_exhausted_ballots,
-                           permute=permute,
-                           log_to_stderr=log_to_stderr,
-                           save_log=save_log)

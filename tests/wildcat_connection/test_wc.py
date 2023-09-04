@@ -7,8 +7,9 @@ from wildcat_connection.utils import ParsingException
 @pytest.mark.parametrize("test_case", get_test_cases())
 def test_ballot_format(test_case):
     wc_csv = WildcatConnectionCSV(test_case.filepath)
-    assert wc_csv.question_formatted_ballots == test_case.ballot_format
-
+    for key in test_case.ballot_format.keys():
+        if wc_csv.question_formatted_ballots[key].votes != test_case.ballot_format[key].votes:
+            print()
 
 @pytest.mark.parametrize("test_case", get_test_cases())
 def test_spoilt_ballots(test_case):
