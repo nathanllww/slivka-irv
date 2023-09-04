@@ -1,11 +1,20 @@
 import os
 import argbind
 import logging
-from io import StringIO
 from wildcat_connection import WildcatConnectionCSV
 from . import IRVElection
 
-IRVElection = argbind.bind(IRVElection.irv_election, without_prefix=True)
+"""
+WTF is going on here?
+
+In the case that the website breaks, you can use the command line tool specified here to run the election.
+
+WTF is argbind?
+
+`argbind` turns functions into CLI interfaces without verbose argparsing.
+"""
+IRVElection.__init__.__doc__ = IRVElection.__doc__  # this makes -h docs work.
+IRVElection = argbind.bind(IRVElection, without_prefix=True)  # This actually connects the function to CLI.
 
 _logger = logging.getLogger(__name__)
 
@@ -58,8 +67,8 @@ def run(
         print(f"Election results saved in {elections_output}")
 
     results = []
-    for name, ballot_str in ballot.question_formatted_ballots.items():
-        election = IRVElection(StringIO(ballot_str), name)
+    for name, ballots in ballot.question_formatted_ballots.items():
+        election = IRVElection(ballots, name)
         winner, steps = election.run()
         if verbose:
             print(question_title_format(name))

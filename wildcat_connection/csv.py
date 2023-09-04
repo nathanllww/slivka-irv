@@ -35,7 +35,7 @@ class WildcatConnectionCSV:
         self.__df: pd.DataFrame = self._get_dataframe()
         self.question_num_candidates: dict[str, int] = self._get_question_num_candidates()
         formatted_ballots, spoilt_ballots = self._get_ballot_formatted_strings()
-        self.question_formatted_ballots: dict[str, str] = formatted_ballots
+        self.question_formatted_ballots: dict[str, RankedChoiceBallots] = formatted_ballots
         self.question_spoilt_ballots: dict[str, list[str]] = spoilt_ballots
 
     def _get_dataframe(self) -> pd.DataFrame:
@@ -100,7 +100,7 @@ class WildcatConnectionCSV:
         Returns
         -------
         ballot_list : RankedChoiceBallots
-            Formatted list of list of ballots
+            Ballot object
         spoiled_ballots : list[str]
             List of Submission IDs of spoiled ballots
         """
@@ -124,7 +124,7 @@ class WildcatConnectionCSV:
         ballots = RankedChoiceBallots(valid_rows)
         return ballots, spoiled_ballots
 
-    def _get_ballot_formatted_strings(self) -> tuple[dict[str, str], dict[str, list[str]]]:
+    def _get_ballot_formatted_strings(self) -> tuple[dict[str, RankedChoiceBallots], dict[str, list[str]]]:
         """
         For each question, get the ballot formatted string and the submission ids of spoilt ballots.
 

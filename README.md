@@ -18,20 +18,18 @@ Create python >=3.9 environment with the environment manager of your choice. For
 $ conda create -n slivka-irv python=3.9
 $ conda activate slivka-irv
 ```
-All the following steps, and running the program, should be done in your newly created environment.
-This package is not yet on PyPi. For now, the package should be cloned from Github, then installed.
+All the following steps, and running the program, should be done in your newly created environment. We are on PyPi:
 ```shell
-$ git clone https://github.com/nathanllww/slivka-irv.git
-$ pip install -e slivka-irv
+$ python -m pip install slivka-irv
 ```
 Ensure the package is installed correctly.
 ```shell
 $ irv
-usage: irv [-h] [--args.save ARGS.SAVE] [--args.load ARGS.LOAD] [--args.debug ARGS.DEBUG]
-           [--remove_exhausted_ballots] [--permute] [--log_to_stderr] [--save_log]
-           [--ballots_output] [--elections_output ELECTIONS_OUTPUT]
+usage: irv [-h] [--args.save ARGS.SAVE] [--args.load ARGS.LOAD] [--args.debug ARGS.DEBUG] [--remove_exhausted_ballots] [--log_to_stderr] [--save_log] [--ballots_output]
+           [--elections_output ELECTIONS_OUTPUT] [--verbose]
            wc_file
 irv: error: the following arguments are required: wc_file
+
 ```
 
 ## Usage Instructions
@@ -58,6 +56,33 @@ For more information on the flags, run:
 $ irv -h
 ```
 
+If you don't have a CSV ready, you can try out our tool with one of our test cases:
+```shell
+$ irv tests/wildcat_connection/test_cases/8_way_race.csv 
+Election results saved in ./elections
+
+#####
+# Q #
+#####
+
+=============
+= WINNER: C =
+=============
+There were 7 total ballots cast
+In the final round, C received 4 votes, or 57.14%
+
+
+==========
+= ROUNDS =
+==========
+Round 1: {'B': 0, 'H': 0, 'E': 0, 'D': 0, 'C': 3, 'A': 2, 'G': 1, 'F': 1}
+Round 2: {'G': 1, 'F': 1, 'C': 3, 'A': 2}
+Round 3: {'F': 1, 'C': 3, 'A': 2}
+Round 4: {'A': 3, 'C': 3}
+Round 5: Counter({'C': 4})
+
+```
+
 ## Algorithmic Details
 This project uses the standard IRV algorithm: for each ballot, give a vote to the highest ranked non-eliminated candidate, and then remove the candidate with the lowest votes.
 In addition, if any at any step one candidate has over half the vote, that candidate is automatically declared the winner.
@@ -74,7 +99,3 @@ Sometimes, both of these methods fail to break tie, in which case the algorithm 
 By default, exhausted ballots (i.e. ballots on which every ranked candidate has been eliminated) are counted of votes of ''no confidence,'' since a ballot can only be exhausted if a voter does not rank every candidate.
 In other words, to win a candidate must receive a tally of at least half of all ballots cast, rather than simply being the only candidate remaining after all others have been eliminated.
 To declare the last remaining candidate the winner (or equivalently to remove exhausted ballots), run `irv` with the `--remove_exhausted_ballots` flag.
-
-## Future Steps
-- Javascript/PHP bindings
-- Additional Ranked Choice Voting algorithms

@@ -30,11 +30,10 @@ class WCTestCase:
             question = os.path.basename(path).split('.')[0]
             with open(os.path.join(folder, path)) as file:
                 string_ballot_format = file.read()
-                # ANDREAS (8/13/2023)
                 # This converts the old string format into the new RankedChoiceBallots format
                 ballot_formats[question] = RankedChoiceBallots([
                     row.split(",") for row in string_ballot_format.split("\n")
-                    if not row.strip().startswith("#") and len(row) > 0
+                    if not row.strip().startswith("#")
                 ])
         return ballot_formats
 

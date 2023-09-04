@@ -1,4 +1,12 @@
 class RankedChoiceBallots:
+    """
+    RankedChoiceBallots is a representation of a single elections ballots.
+
+    Attributes
+    ----------
+    votes : list[list[str]]
+        2D list of votes. `votes[i][j]` is the candidate name that the `i`th voter ranked as `(j+1)`th.
+    """
     def __init__(self, votes):
         self.votes: list[list[str]] = votes
 
@@ -12,6 +20,7 @@ class RankedChoiceBallots:
                 raise ValueError("Not every value is a string!")
 
     def get_candidates(self) -> set[str]:
+        """Gets all unique candidate names"""
         candidates = set()
         for single_ballot in self.votes:
             for candidate in single_ballot:
@@ -19,31 +28,11 @@ class RankedChoiceBallots:
         return candidates
 
     def get_appearances_in_rank(self, candidate: str, rank: int):
-        rank_talley = 0
+        """Gets the number times `candidate` was ranked `rank` before eliminations"""
+        rank_tally = 0
         for single_ballot in self.votes:
             if len(single_ballot) < rank:
                 continue
             elif single_ballot[rank-1] == candidate:
-                rank_talley += 1
-        return rank_talley
-
-# votes = [
-#     ["Norm", "Normie", "Norman"],
-#     ["Norm", "Normie"],
-#     ["Norman", "Norm", "Normie"]
-# ]
-#
-#
-# ballots = RankedChoiceBallots(votes)
-# print(ballots.votes)
-#
-# votes = [
-#     ["Norm", "Normie", "Norman"],
-#     ["Norm", "Normie"],
-#     ["Norman", "Norm", "Normie"],
-#     ["Andreas"]
-# ]
-#
-# ballots2 = RankedChoiceBallots(votes)
-# print(ballots2.votes)
-
+                rank_tally += 1
+        return rank_tally

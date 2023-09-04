@@ -1,17 +1,14 @@
-import pytest
-from irv.ballots import RankedChoiceBallots
-import csv
 import collections
 import os
 from io import TextIOBase
 import logging
-import pandas as pd
-import numpy as np
 import datetime
-from . import LOGGING_FOLDER
-from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
 import warnings
 from copy import deepcopy
+
+from irv.ballots import RankedChoiceBallots
+from . import LOGGING_FOLDER
+from .constants import UNBREAKABLE_TIE_WINNER, NO_CONFIDENCE
 
 
 class IRVElection:
@@ -19,7 +16,6 @@ class IRVElection:
     Instant-Runoff Voting (IRV) election counter
     Design decisions/known limitations:
         - Only supports one election
-        - If a candidate gets a majority, immediate win
 
     Ballot format reference:
         - CSV with each line a ballot, ranking candidates from left to right
@@ -29,23 +25,10 @@ class IRVElection:
             A,B,C
             C,B
 
-    Attributes
-    ----------
-    ballots : np.ndarray[object]
-        - ndarray containing rankings of candidates, where each ranking is
-        a list of str.
-    candidates : set[str]
-        - set of candidate names
-
-
     Parameters
     ----------
-    txt_stream : TextIOBase
-        - Text stream containing ballot data.
-        May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
-        This class is not responsible for opening and closing this stream.
-    name : str, optional
-        - Name of election question. Used for logging.
+    ballots : RankedChoiceBallots
+        - Ballots object containing votes cast.
     remove_exhausted_ballots : boolean, optional
         - Whether to remove exhausted ballots from the count or count them
         as ``no confidence''. Default of False does the latter
@@ -55,6 +38,15 @@ class IRVElection:
         - Whether to save logs to a timestamped file.
         Logs folder can be set by environment variable `LOGGING_FOLDER`.
         Default False
+
+    Attributes
+    ----------
+    ballots : np.ndarray[object]
+        - ndarray containing rankings of candidates, where each ranking is
+        a list of str.
+    candidates : set[str]
+        - set of candidate names
+
     """
     def __init__(self,
                  ballots: RankedChoiceBallots,
@@ -376,7 +368,7 @@ class IRVElection:
             return False
 
     @staticmethod
-    def irv_election(votes,
+    def irv_election(votes: RankedChoiceBallots,
                      remove_exhausted_ballots: bool = False,
                      log_to_stderr: bool = False,
                      save_log: bool = False) -> "IRVElection":
@@ -384,20 +376,16 @@ class IRVElection:
         Creates IRV election.
 
         This function should be bound by argbind when using the end-to-end command line tool.
-        This is because `name` should be a kwarg when an election is initialized, but should be
-        automatically generated from a Wildcat Connection Election's question names in the command line tool.
-
-        If we decide that the only place where an IRVElection should be initialized is in `irv.__main__.run`,
-        then `__init__`'s function signature should be exactly like this function, and the class should be bound.
+        This is here because I didn't want to figure out how to bind an __init__ with argbind.
+        Prem Seetharaman maintains argbind and if you find issues with it, contact him and tell him
+        that Andreas sent you: https://github.com/pseeth/argbind
 
         Parameters
         ----------
-        txt_stream : TextIOBase
+        votes : RankedChoiceBallots
             - Text stream containing ballot data.
             May be generated via `open("ballot.txt")`, or by making an `io.StringIO` object.
             This class is not responsible for opening and closing this stream.
-        name : str
-            - Name of election question. Used for logging.
         remove_exhausted_ballots : boolean, optional
             - Whether to remove exhausted ballots from the count or count them
             as ``no confidence''. Default of False does the latter
@@ -412,7 +400,9 @@ class IRVElection:
         election : IRVElection
             IRVElection object from parameters.
         """
-        return IRVElection(votes,
-                           remove_exhausted_ballots=remove_exhausted_ballots,
-                           log_to_stderr=log_to_stderr,
-                           save_log=save_log)
+        return IRVElection(
+            votes,
+            remove_exhausted_ballots=remove_exhausted_ballots,
+            log_to_stderr=log_to_stderr,
+            save_log=save_log
+        )
