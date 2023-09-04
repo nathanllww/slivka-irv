@@ -12,6 +12,8 @@ In the case that the website breaks, you can use the command line tool specified
 WTF is argbind?
 
 `argbind` turns functions into CLI interfaces without verbose argparsing.
+Prem Seetharaman (previously a postdoc at NU) maintains argbind and if you find issues with it, contact him and tell him
+that Andreas sent you: https://github.com/pseeth/argbind
 """
 IRVElection.__init__.__doc__ = IRVElection.__doc__  # this makes -h docs work.
 IRVElection = argbind.bind(IRVElection, without_prefix=True)  # This actually connects the function to CLI.
